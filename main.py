@@ -95,20 +95,56 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
 
     if fhir_server:
         fhir_request = Request(host=fhir_server.host, port=fhir_server.port, path=fhir_server.path)
-        for clinic in clinics:
+        
+        # Create organizations first and store their server-assigned IDs
+        organization_id_map = {}
+        for i, clinic in enumerate(clinics):
             response = fhir_request.create("Organization", clinic)
             if response.get('issue') and response['issue'][0]['severity'] == 'error':
                 err = response['issue'][0]['diagnostics']
                 print(err)
                 raise Exception(err)
-            print(f"Created Organization with ID: {response.get('id')}")
+            server_id = response.get('id')
+            organization_id_map[clinic['id']] = server_id
+            print(f"Created Organization with ID: {server_id}")
+        
+        # Update location references to use server-assigned organization IDs
+        for location in locations:
+            original_org_id = location['managingOrganization']['reference'].split('/')[1]
+            server_org_id = organization_id_map[original_org_id]
+            location['managingOrganization']['reference'] = f"Organization/{server_org_id}"
+        
+        # Create locations with updated references and store their server-assigned IDs
+        location_id_map = {}
         for location in locations:
             response = fhir_request.create("Location", location)
             if response.get('issue') and response['issue'][0]['severity'] == 'error':
                 err = response['issue'][0]['diagnostics']
                 print(err)
                 raise Exception(err)
-            print(f"Created Location with ID: {response.get('id')}")
+            server_id = response.get('id')
+            location_id_map[location['id']] = server_id
+            print(f"Created Location with ID: {server_id}")
+        
+        # Create patients first and store their server-assigned IDs
+        patient_id_map = {}
+        for patient in patients:
+            response = fhir_request.create("Patient", patient)
+            if response.get('issue') and response['issue'][0]['severity'] == 'error':
+                err = response['issue'][0]['diagnostics']
+                print(err)
+                raise Exception(err)
+            server_id = response.get('id')
+            patient_id_map[patient['id']] = server_id
+            print(f"Created Patient with ID: {server_id}")
+        
+        # Update condition references to use server-assigned patient IDs
+        for condition in conditions:
+            original_patient_id = condition['subject']['reference'].split('/')[1]
+            server_patient_id = patient_id_map[original_patient_id]
+            condition['subject']['reference'] = f"Patient/{server_patient_id}"
+        
+        # Create conditions with updated references
         for condition in conditions:
             response = fhir_request.create("Condition", condition)
             if response.get('issue') and response['issue'][0]['severity'] == 'error':
@@ -116,20 +152,37 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
                 print(err)
                 raise Exception(err)
             print(f"Created Condition with ID: {response.get('id')}")
-        for patient in patients:
-            response = fhir_request.create("Patient", patient)
-            if response.get('issue') and response['issue'][0]['severity'] == 'error':
-                err = response['issue'][0]['diagnostics']
-                print(err)
-                raise Exception(err)
-            print(f"Created Patient with ID: {response.get('id')}")
+        
+        # Create practitioners and store their server-assigned IDs
+        practitioner_id_map = {}
         for practitioner in practitioners:
             response = fhir_request.create("Practitioner", practitioner)
             if response.get('issue') and response['issue'][0]['severity'] == 'error':
                 err = response['issue'][0]['diagnostics']
                 print(err)
                 raise Exception(err)
-            print(f"Created Practitioner with ID: {response.get('id')}")
+            server_id = response.get('id')
+            practitioner_id_map[practitioner['id']] = server_id
+            print(f"Created Practitioner with ID: {server_id}")
+        
+        # Update appointment references to use server-assigned IDs
+        for appointment in appointments:
+            # Update patient reference
+            original_patient_id = appointment['participant'][0]['actor']['reference'].split('/')[1]
+            server_patient_id = patient_id_map[original_patient_id]
+            appointment['participant'][0]['actor']['reference'] = f"Patient/{server_patient_id}"
+            
+            # Update practitioner reference
+            original_practitioner_id = appointment['participant'][1]['actor']['reference'].split('/')[1]
+            server_practitioner_id = practitioner_id_map[original_practitioner_id]
+            appointment['participant'][1]['actor']['reference'] = f"Practitioner/{server_practitioner_id}"
+            
+            # Update location reference
+            original_location_id = appointment['participant'][2]['actor']['reference'].split('/')[1]
+            server_location_id = location_id_map[original_location_id]
+            appointment['participant'][2]['actor']['reference'] = f"Location/{server_location_id}"
+        
+        # Create appointments with updated references
         for appointment in appointments:
             response = fhir_request.create("Appointment", appointment)
             if response.get('issue') and response['issue'][0]['severity'] == 'error':
