@@ -4,16 +4,38 @@ Some helper scripts for generating FHIR data for testing environments.
 import random
 from faker import Faker
 
+import json
+from typing import Optional
+
 from lib.crud import Request
 from lib.resources import generate_clinic_and_location, generate_patient, generate_practitioner, generate_condition, generate_appointment
+
+
+class FHIRServerConfig:
+    """
+    Configuration for connecting to a FHIR server.
+    """
+    def __init__(self, host: str = 'localhost', port: int = 8080, path: str = "/fhir") -> None:
+        self.host = host
+        self.port = port
+        self.path = path
 
 
 # Initialize Faker to generate random data
 fake = Faker()
 
 
-def main():
-    """Main function to generate a set of interconnected FHIR resources."""
+def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServerConfig] = None) -> None:
+    """
+    Main function to generate a set of interconnected FHIR resources.
+
+    Generates Patients, Practitioners, Clinics, Locations, Conditions, and Appointments,
+    and saves them to a JSON file OR sends them to a FHIR server.
+
+    :param output_filename: Optional; if provided, the generated data will be saved to this file.
+    :param fhir_server: Optional; if provided, the generated data will be sent to this FHIR server.
+    :return: None
+    """
     print("Generating FHIR compatible dummy data...")
 
     # Generate clinics and their locations
@@ -60,10 +82,10 @@ def main():
     }
 
     # Write the output to a JSON file
-    output_filename = "fhir_dummy_data.json"
-    #with open(output_filename, 'w') as f: json.dump(fhir_bundle, f, indent=2)
+    if output_filename:
+        with open(output_filename, 'w') as f: json.dump(fhir_bundle, f, indent=2)
+        print(f"\nSuccessfully generated dummy data and saved it to '{output_filename}'")
 
-    print(f"\nSuccessfully generated dummy data and saved it to '{output_filename}'")
     print(f" - Patients: {len(patients)}")
     print(f" - Practitioners: {len(practitioners)}")
     print(f" - Clinics: {len(clinics)}")
@@ -71,52 +93,51 @@ def main():
     print(f" - Conditions: {len(conditions)}")
     print(f" - Appointments: {len(appointments)}")
 
-    # Example of sending a request using the Request class from lib.crud
-    # Note: Uncomment and configure the following lines to test sending requests
-    fhir_request = Request(host="localhost", port=8080, path="/fhir")
-    for clinic in clinics:
-        response = fhir_request.create("Organization", clinic)
-        if response.get('issue') and response['issue'][0]['severity'] == 'error':
-            err = response['issue'][0]['diagnostics']
-            print(err)
-            raise Exception(err)
-        print(f"Created Organization with ID: {response.get('id')}")
-    for location in locations:
-        response = fhir_request.create("Location", location)
-        if response.get('issue') and response['issue'][0]['severity'] == 'error':
-            err = response['issue'][0]['diagnostics']
-            print(err)
-            raise Exception(err)
-        print(f"Created Location with ID: {response.get('id')}")
-    for condition in conditions:
-        response = fhir_request.create("Condition", condition)
-        if response.get('issue') and response['issue'][0]['severity'] == 'error':
-            err = response['issue'][0]['diagnostics']
-            print(err)
-            raise Exception(err)
-        print(f"Created Condition with ID: {response.get('id')}")
-    for patient in patients:
-        response = fhir_request.create("Patient", patient)
-        if response.get('issue') and response['issue'][0]['severity'] == 'error':
-            err = response['issue'][0]['diagnostics']
-            print(err)
-            raise Exception(err)
-        print(f"Created Patient with ID: {response.get('id')}")
-    for practitioner in practitioners:
-        response = fhir_request.create("Practitioner", practitioner)
-        if response.get('issue') and response['issue'][0]['severity'] == 'error':
-            err = response['issue'][0]['diagnostics']
-            print(err)
-            raise Exception(err)
-        print(f"Created Practitioner with ID: {response.get('id')}")
-    for appointment in appointments:
-        response = fhir_request.create("Appointment", appointment)
-        if response.get('issue') and response['issue'][0]['severity'] == 'error':
-            err = response['issue'][0]['diagnostics']
-            print(err)
-            raise Exception(err)
-        print(f"Created Appointment with ID: {response.get('id')}")
+    if fhir_server:
+        fhir_request = Request(host=fhir_server.host, port=fhir_server.port, path=fhir_server.path)
+        for clinic in clinics:
+            response = fhir_request.create("Organization", clinic)
+            if response.get('issue') and response['issue'][0]['severity'] == 'error':
+                err = response['issue'][0]['diagnostics']
+                print(err)
+                raise Exception(err)
+            print(f"Created Organization with ID: {response.get('id')}")
+        for location in locations:
+            response = fhir_request.create("Location", location)
+            if response.get('issue') and response['issue'][0]['severity'] == 'error':
+                err = response['issue'][0]['diagnostics']
+                print(err)
+                raise Exception(err)
+            print(f"Created Location with ID: {response.get('id')}")
+        for condition in conditions:
+            response = fhir_request.create("Condition", condition)
+            if response.get('issue') and response['issue'][0]['severity'] == 'error':
+                err = response['issue'][0]['diagnostics']
+                print(err)
+                raise Exception(err)
+            print(f"Created Condition with ID: {response.get('id')}")
+        for patient in patients:
+            response = fhir_request.create("Patient", patient)
+            if response.get('issue') and response['issue'][0]['severity'] == 'error':
+                err = response['issue'][0]['diagnostics']
+                print(err)
+                raise Exception(err)
+            print(f"Created Patient with ID: {response.get('id')}")
+        for practitioner in practitioners:
+            response = fhir_request.create("Practitioner", practitioner)
+            if response.get('issue') and response['issue'][0]['severity'] == 'error':
+                err = response['issue'][0]['diagnostics']
+                print(err)
+                raise Exception(err)
+            print(f"Created Practitioner with ID: {response.get('id')}")
+        for appointment in appointments:
+            response = fhir_request.create("Appointment", appointment)
+            if response.get('issue') and response['issue'][0]['severity'] == 'error':
+                err = response['issue'][0]['diagnostics']
+                print(err)
+                raise Exception(err)
+            print(f"Created Appointment with ID: {response.get('id')}")
 
 
 if __name__ == "__main__":
-    main()
+    main(fhir_server=FHIRServerConfig(host="localhost", port=8080, path="/fhir"))
