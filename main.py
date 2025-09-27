@@ -22,6 +22,11 @@ from lib.resources.diagnostic_report import generate_diagnostic_report
 from lib.resources.service_request import generate_service_request
 from lib.resources.clinical_impression import generate_clinical_impression
 from lib.resources.family_member_history import generate_family_member_history
+from lib.resources.immunization import generate_immunization
+from lib.resources.medication_administration import generate_medication_administration
+from lib.resources.allergy_intolerance import generate_allergy_intolerance
+from lib.resources.care_plan import generate_care_plan
+from lib.resources.coverage import generate_coverage
 
 
 class FHIRServerConfig:
@@ -74,6 +79,11 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
     service_requests = []
     clinical_impressions = []
     family_member_histories = []
+    immunizations = []
+    medication_administrations = []
+    allergy_intolerances = []
+    care_plans = []
+    coverages = []
 
     for _ in range(25):
         patient = generate_patient()
@@ -177,6 +187,82 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
             )
             family_member_histories.append(family_member_history)
 
+        # Generate 1 to 3 immunizations for each patient
+        for _ in range(random.randint(1, 3)):
+            # Assign a random practitioner to the immunization
+            practitioner = random.choice(practitioners)
+            # Optionally link to an encounter (60% chance)
+            encounter = random.choice(patient_encounters) if random.random() < 0.6 else None
+            # Optionally link to a location (80% chance)
+            location = random.choice(locations) if random.random() < 0.8 else None
+            
+            immunization = generate_immunization(
+                patient['id'], 
+                practitioner['id'], 
+                encounter['id'] if encounter else None,
+                location['id'] if location else None
+            )
+            immunizations.append(immunization)
+
+        # Generate 2 to 5 medication administrations for each patient
+        for _ in range(random.randint(2, 5)):
+            # Assign a random practitioner to the medication administration
+            practitioner = random.choice(practitioners)
+            # Optionally link to an encounter (70% chance)
+            encounter = random.choice(patient_encounters) if random.random() < 0.7 else None
+            # Optionally link to a medication request (50% chance)
+            medication_request = random.choice(medication_requests) if random.random() < 0.5 else None
+            
+            medication_administration = generate_medication_administration(
+                patient['id'], 
+                practitioner['id'],
+                medication_request['id'] if medication_request else None,
+                encounter['id'] if encounter else None
+            )
+            medication_administrations.append(medication_administration)
+
+        # Generate 1 to 4 allergy intolerances for each patient
+        for _ in range(random.randint(1, 4)):
+            # Assign a random practitioner to the allergy (optional, 60% chance)
+            practitioner = random.choice(practitioners) if random.random() < 0.6 else None
+            
+            allergy_intolerance = generate_allergy_intolerance(
+                patient['id'],
+                practitioner['id'] if practitioner else None
+            )
+            allergy_intolerances.append(allergy_intolerance)
+
+        # Generate 1 to 3 care plans for each patient
+        for _ in range(random.randint(1, 3)):
+            # Assign a random practitioner to the care plan
+            practitioner = random.choice(practitioners)
+            # Optionally link to an encounter (50% chance)
+            encounter = random.choice(patient_encounters) if random.random() < 0.5 else None
+            # Optionally link to a condition (70% chance)
+            condition = random.choice(conditions) if random.random() < 0.7 else None
+            
+            care_plan = generate_care_plan(
+                patient['id'],
+                practitioner['id'],
+                encounter['id'] if encounter else None,
+                condition['id'] if condition else None
+            )
+            care_plans.append(care_plan)
+
+        # Generate 1 to 2 coverages for each patient
+        for _ in range(random.randint(1, 2)):
+            # Assign a random organization as the insurer
+            organization = random.choice(clinics)
+            # Optionally assign a different policy holder (20% chance)
+            policy_holder = random.choice(patients) if random.random() < 0.2 else None
+            
+            coverage = generate_coverage(
+                patient['id'],
+                organization['id'],
+                policy_holder['id'] if policy_holder else None
+            )
+            coverages.append(coverage)
+
     # Combine all generated resources into a single dictionary
     fhir_bundle = {
         "patients": patients,
@@ -192,7 +278,12 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
         "diagnostic_reports": diagnostic_reports,
         "service_requests": service_requests,
         "clinical_impressions": clinical_impressions,
-        "family_member_histories": family_member_histories
+        "family_member_histories": family_member_histories,
+        "immunizations": immunizations,
+        "medication_administrations": medication_administrations,
+        "allergy_intolerances": allergy_intolerances,
+        "care_plans": care_plans,
+        "coverages": coverages
     }
 
     # Write the output to a JSON file
@@ -214,6 +305,11 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
     print(f" - Service Requests: {len(service_requests)}")
     print(f" - Clinical Impressions: {len(clinical_impressions)}")
     print(f" - Family Member Histories: {len(family_member_histories)}")
+    print(f" - Immunizations: {len(immunizations)}")
+    print(f" - Medication Administrations: {len(medication_administrations)}")
+    print(f" - Allergy Intolerances: {len(allergy_intolerances)}")
+    print(f" - Care Plans: {len(care_plans)}")
+    print(f" - Coverages: {len(coverages)}")
 
     if fhir_server:
         fhir_request = Request(host=fhir_server.host, port=fhir_server.port, path=fhir_server.path)
