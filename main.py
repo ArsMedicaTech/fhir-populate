@@ -21,6 +21,7 @@ from lib.resources.procedure import generate_procedure
 from lib.resources.diagnostic_report import generate_diagnostic_report
 from lib.resources.service_request import generate_service_request
 from lib.resources.clinical_impression import generate_clinical_impression
+from lib.resources.family_member_history import generate_family_member_history
 
 
 class FHIRServerConfig:
@@ -72,6 +73,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
     diagnostic_reports = []
     service_requests = []
     clinical_impressions = []
+    family_member_histories = []
 
     for _ in range(25):
         patient = generate_patient()
@@ -164,6 +166,17 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
             )
             clinical_impressions.append(clinical_impression)
 
+        # Generate 2 to 4 family member histories for each patient
+        for _ in range(random.randint(2, 4)):
+            # Assign a random practitioner to the family member history (optional)
+            practitioner = random.choice(practitioners) if random.random() < 0.7 else None
+            
+            family_member_history = generate_family_member_history(
+                patient['id'], 
+                practitioner['id'] if practitioner else None
+            )
+            family_member_histories.append(family_member_history)
+
     # Combine all generated resources into a single dictionary
     fhir_bundle = {
         "patients": patients,
@@ -178,7 +191,8 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
         "encounters": encounters,
         "diagnostic_reports": diagnostic_reports,
         "service_requests": service_requests,
-        "clinical_impressions": clinical_impressions
+        "clinical_impressions": clinical_impressions,
+        "family_member_histories": family_member_histories
     }
 
     # Write the output to a JSON file
@@ -199,6 +213,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
     print(f" - Diagnostic Reports: {len(diagnostic_reports)}")
     print(f" - Service Requests: {len(service_requests)}")
     print(f" - Clinical Impressions: {len(clinical_impressions)}")
+    print(f" - Family Member Histories: {len(family_member_histories)}")
 
     if fhir_server:
         fhir_request = Request(host=fhir_server.host, port=fhir_server.port, path=fhir_server.path)
