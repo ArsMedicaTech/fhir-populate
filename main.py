@@ -11,6 +11,7 @@ from lib.crud import Request
 from lib.resources import (generate_clinic_and_location, generate_patient, generate_practitioner, generate_condition,
                            generate_appointment, generate_medication_request, generate_procedure, generate_observation,
                            generate_encounter)
+from lib.diagnostic_report_generator import generate_diagnostic_report
 
 
 class FHIRServerConfig:
@@ -59,6 +60,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
     procedures = []
     observations = []
     encounters = []
+    diagnostic_reports = []
 
     for _ in range(25):
         patient = generate_patient()
@@ -99,6 +101,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
             observations.append(observation)
 
         # Generate 1 to 4 encounters for each patient
+        patient_encounters = []
         for _ in range(random.randint(1, 4)):
             # Assign a random practitioner, location, and organization to the encounter
             practitioner = random.choice(practitioners)
@@ -106,6 +109,21 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
             organization = random.choice(clinics)
             encounter = generate_encounter(patient['id'], practitioner['id'], location['id'], organization['id'])
             encounters.append(encounter)
+            patient_encounters.append(encounter)
+
+        # Generate 1 to 2 diagnostic reports for each patient
+        for _ in range(random.randint(1, 2)):
+            # Assign a random practitioner and encounter to the diagnostic report
+            practitioner = random.choice(practitioners)
+            encounter = random.choice(patient_encounters)
+            
+            # Get some observations for this patient to include in the report
+            patient_observations = [obs for obs in observations if obs['subject']['reference'] == f"Patient/{patient['id']}"]
+            selected_observations = random.sample(patient_observations, min(3, len(patient_observations)))
+            observation_ids = [obs['id'] for obs in selected_observations]
+            
+            diagnostic_report = generate_diagnostic_report(patient['id'], practitioner['id'], encounter['id'], observation_ids)
+            diagnostic_reports.append(diagnostic_report)
 
     # Combine all generated resources into a single dictionary
     fhir_bundle = {
@@ -118,7 +136,8 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
         "medication_requests": medication_requests,
         "procedures": procedures,
         "observations": observations,
-        "encounters": encounters
+        "encounters": encounters,
+        "diagnostic_reports": diagnostic_reports
     }
 
     # Write the output to a JSON file
@@ -136,6 +155,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
     print(f" - Procedures: {len(procedures)}")
     print(f" - Observations: {len(observations)}")
     print(f" - Encounters: {len(encounters)}")
+    print(f" - Diagnostic Reports: {len(diagnostic_reports)}")
 
     if fhir_server:
         fhir_request = Request(host=fhir_server.host, port=fhir_server.port, path=fhir_server.path)
