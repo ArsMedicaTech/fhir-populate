@@ -8,9 +8,16 @@ import json
 from typing import Optional
 
 from lib.crud import Request
-from lib.resources import (generate_clinic_and_location, generate_patient, generate_practitioner, generate_condition,
-                           generate_appointment, generate_medication_request, generate_procedure, generate_observation,
-                           generate_encounter)
+
+from lib.resources.appointment import generate_appointment
+from lib.resources.clinic import generate_clinic_and_location
+from lib.resources.condition import generate_condition
+from lib.resources.encounter import generate_encounter
+from lib.resources.medication import generate_medication_request
+from lib.resources.observation import generate_observation
+from lib.resources.patient import generate_patient
+from lib.resources.practitioner import generate_practitioner
+from lib.resources.procedure import generate_procedure
 from lib.diagnostic_report_generator import generate_diagnostic_report
 
 
@@ -352,4 +359,5 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
 
 
 if __name__ == "__main__":
-    main(fhir_server=FHIRServerConfig(host="localhost", port=8080, path="/fhir"))
+    main(output_filename="fhir_dummy_data.json", fhir_server=FHIRServerConfig(host="localhost", port=8080, path="/fhir"))
+
