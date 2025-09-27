@@ -19,6 +19,7 @@ from lib.resources.patient import generate_patient
 from lib.resources.practitioner import generate_practitioner
 from lib.resources.procedure import generate_procedure
 from lib.resources.diagnostic_report import generate_diagnostic_report
+from lib.resources.service_request import generate_service_request
 
 
 class FHIRServerConfig:
@@ -68,6 +69,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
     observations = []
     encounters = []
     diagnostic_reports = []
+    service_requests = []
 
     for _ in range(25):
         patient = generate_patient()
@@ -132,6 +134,20 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
             diagnostic_report = generate_diagnostic_report(patient['id'], practitioner['id'], encounter['id'], observation_ids)
             diagnostic_reports.append(diagnostic_report)
 
+        # Generate 1 to 3 service requests for each patient
+        for _ in range(random.randint(1, 3)):
+            # Assign a random practitioner to the service request
+            practitioner = random.choice(practitioners)
+            # Optionally link to an encounter (50% chance)
+            encounter = random.choice(patient_encounters) if random.choice([True, False]) else None
+            
+            service_request = generate_service_request(
+                patient['id'], 
+                practitioner['id'], 
+                encounter['id'] if encounter else None
+            )
+            service_requests.append(service_request)
+
     # Combine all generated resources into a single dictionary
     fhir_bundle = {
         "patients": patients,
@@ -144,7 +160,8 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
         "procedures": procedures,
         "observations": observations,
         "encounters": encounters,
-        "diagnostic_reports": diagnostic_reports
+        "diagnostic_reports": diagnostic_reports,
+        "service_requests": service_requests
     }
 
     # Write the output to a JSON file
@@ -163,6 +180,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
     print(f" - Observations: {len(observations)}")
     print(f" - Encounters: {len(encounters)}")
     print(f" - Diagnostic Reports: {len(diagnostic_reports)}")
+    print(f" - Service Requests: {len(service_requests)}")
 
     if fhir_server:
         fhir_request = Request(host=fhir_server.host, port=fhir_server.port, path=fhir_server.path)
