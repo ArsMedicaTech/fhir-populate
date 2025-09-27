@@ -9,7 +9,8 @@ from typing import Optional
 
 from lib.crud import Request
 from lib.resources import (generate_clinic_and_location, generate_patient, generate_practitioner, generate_condition,
-                           generate_appointment, generate_medication_request, generate_procedure, generate_observation)
+                           generate_appointment, generate_medication_request, generate_procedure, generate_observation,
+                           generate_encounter)
 
 
 class FHIRServerConfig:
@@ -57,6 +58,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
     medication_requests = []
     procedures = []
     observations = []
+    encounters = []
 
     for _ in range(25):
         patient = generate_patient()
@@ -96,6 +98,15 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
             observation = generate_observation(patient['id'], practitioner['id'])
             observations.append(observation)
 
+        # Generate 1 to 4 encounters for each patient
+        for _ in range(random.randint(1, 4)):
+            # Assign a random practitioner, location, and organization to the encounter
+            practitioner = random.choice(practitioners)
+            location = random.choice(locations)
+            organization = random.choice(clinics)
+            encounter = generate_encounter(patient['id'], practitioner['id'], location['id'], organization['id'])
+            encounters.append(encounter)
+
     # Combine all generated resources into a single dictionary
     fhir_bundle = {
         "patients": patients,
@@ -106,7 +117,8 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
         "appointments": appointments,
         "medication_requests": medication_requests,
         "procedures": procedures,
-        "observations": observations
+        "observations": observations,
+        "encounters": encounters
     }
 
     # Write the output to a JSON file
@@ -123,6 +135,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
     print(f" - Medication Requests: {len(medication_requests)}")
     print(f" - Procedures: {len(procedures)}")
     print(f" - Observations: {len(observations)}")
+    print(f" - Encounters: {len(encounters)}")
 
     if fhir_server:
         fhir_request = Request(host=fhir_server.host, port=fhir_server.port, path=fhir_server.path)
@@ -285,6 +298,37 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
                 print(err)
                 raise Exception(err)
             print(f"Created Observation with ID: {response.get('id')}")
+
+        # Update encounter references to use server-assigned IDs
+        for encounter in encounters:
+            # Update patient reference
+            original_patient_id = encounter['subject']['reference'].split('/')[1]
+            server_patient_id = patient_id_map[original_patient_id]
+            encounter['subject']['reference'] = f"Patient/{server_patient_id}"
+
+            # Update practitioner reference
+            original_practitioner_id = encounter['participant'][0]['actor']['reference'].split('/')[1]
+            server_practitioner_id = practitioner_id_map[original_practitioner_id]
+            encounter['participant'][0]['actor']['reference'] = f"Practitioner/{server_practitioner_id}"
+
+            # Update location reference
+            original_location_id = encounter['location'][0]['location']['reference'].split('/')[1]
+            server_location_id = location_id_map[original_location_id]
+            encounter['location'][0]['location']['reference'] = f"Location/{server_location_id}"
+
+            # Update organization reference
+            original_organization_id = encounter['serviceProvider']['reference'].split('/')[1]
+            server_organization_id = organization_id_map[original_organization_id]
+            encounter['serviceProvider']['reference'] = f"Organization/{server_organization_id}"
+
+        # Create encounters with updated references
+        for encounter in encounters:
+            response = fhir_request.create("Encounter", encounter)
+            if response.get('issue') and response['issue'][0]['severity'] == 'error':
+                err = response['issue'][0]['diagnostics']
+                print(err)
+                raise Exception(err)
+            print(f"Created Encounter with ID: {response.get('id')}")
 
 
 if __name__ == "__main__":
