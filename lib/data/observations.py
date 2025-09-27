@@ -1,58 +1,46 @@
 """
 Common laboratory observations for FHIR Observation resources.
+Generated from official LOINC database.
 Includes LOINC codes, normal ranges, units, and interpretations.
 """
 
 OBSERVATIONS = [
     {
-        "code": "33747-0",
-        "display": "BNP",
-        "text": "BNP",
+        "code": "13945-1",
+        "display": "Erythrocytes [#/area] in Urine sediment by Microscopy high power field",
+        "text": "RBC #/area UrnS HPF",
         "system": "http://loinc.org",
         "category": "laboratory",
-        "unit": "pg/mL",
+        "unit": "/HPF",
         "unit_system": "http://unitsofmeasure.org",
-        "unit_code": "pg/mL",
-        "normal_range": {"low": 0, "high": 100},
-        "interpretations": {
-            "LOW": {"low": 0, "high": 0},
-            "NORMAL": {"low": 1, "high": 100},
-            "HIGH": {"low": 101, "high": 1000}
-        }
+        "unit_code": "/HPF",
+        "normal_range": {'low': 0, 'high': 100},
+        "interpretations": {'LOW': {'low': 0, 'high': 0}, 'NORMAL': {'low': 1, 'high': 100}, 'HIGH': {'low': 101, 'high': 1000}}
     },
     {
-        "code": "33747-0",
-        "display": "Hemoglobin A1c",
-        "text": "Hemoglobin A1c",
+        "code": "5821-4",
+        "display": "Leukocytes [#/area] in Urine sediment by Microscopy high power field",
+        "text": "WBC #/area UrnS HPF",
         "system": "http://loinc.org",
         "category": "laboratory",
-        "unit": "%",
+        "unit": "/HPF",
         "unit_system": "http://unitsofmeasure.org",
-        "unit_code": "%",
-        "normal_range": {"low": 4.0, "high": 5.6},
-        "interpretations": {
-            "LOW": {"low": 0, "high": 3.9},
-            "NORMAL": {"low": 4.0, "high": 5.6},
-            "HIGH": {"low": 5.7, "high": 15.0}
-        }
+        "unit_code": "/HPF",
+        "normal_range": {'low': 3.5, 'high': 5.0},
+        "interpretations": {'LOW': {'low': 2.0, 'high': 3.4}, 'NORMAL': {'low': 3.5, 'high': 5.0}, 'HIGH': {'low': 5.1, 'high': 8.0}}
     },
     {
-        "code": "33747-0",
-        "display": "Glucose",
-        "text": "Glucose",
+        "code": "2161-8",
+        "display": "Creatinine [Mass/volume] in Urine",
+        "text": "Creat Ur-mCnc",
         "system": "http://loinc.org",
         "category": "laboratory",
         "unit": "mg/dL",
         "unit_system": "http://unitsofmeasure.org",
         "unit_code": "mg/dL",
-        "normal_range": {"low": 70, "high": 100},
-        "interpretations": {
-            "LOW": {"low": 0, "high": 69},
-            "NORMAL": {"low": 70, "high": 100},
-            "HIGH": {"low": 101, "high": 500}
-        }
+        "normal_range": {'low': 0.6, 'high': 1.2},
+        "interpretations": {'LOW': {'low': 0.0, 'high': 0.5}, 'NORMAL': {'low': 0.6, 'high': 1.2}, 'HIGH': {'low': 1.3, 'high': 2.4}}
     },
-
 ]
 
 # Common observation statuses
