@@ -8,7 +8,8 @@ import json
 from typing import Optional
 
 from lib.crud import Request
-from lib.resources import generate_clinic_and_location, generate_patient, generate_practitioner, generate_condition, generate_appointment, generate_medication_request
+from lib.resources import (generate_clinic_and_location, generate_patient, generate_practitioner, generate_condition,
+                           generate_appointment, generate_medication_request, generate_procedure)
 
 
 class FHIRServerConfig:
@@ -54,6 +55,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
     conditions = []
     appointments = []
     medication_requests = []
+    procedures = []
 
     for _ in range(25):
         patient = generate_patient()
@@ -79,6 +81,13 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
             medication_request = generate_medication_request(patient['id'], practitioner['id'])
             medication_requests.append(medication_request)
 
+        # Generate 1 to 3 procedures for each patient
+        for _ in range(random.randint(1, 3)):
+            # Assign a random practitioner to the procedure
+            practitioner = random.choice(practitioners)
+            procedure = generate_procedure(patient['id'], practitioner['id'])
+            procedures.append(procedure)
+
     # Combine all generated resources into a single dictionary
     fhir_bundle = {
         "patients": patients,
@@ -88,6 +97,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
         "conditions": conditions,
         "appointments": appointments,
         "medication_requests": medication_requests,
+        "procedures": procedures
     }
 
     # Write the output to a JSON file
@@ -102,6 +112,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
     print(f" - Conditions: {len(conditions)}")
     print(f" - Appointments: {len(appointments)}")
     print(f" - Medication Requests: {len(medication_requests)}")
+    print(f" - Procedures: {len(procedures)}")
 
     if fhir_server:
         fhir_request = Request(host=fhir_server.host, port=fhir_server.port, path=fhir_server.path)
@@ -221,6 +232,27 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
                 print(err)
                 raise Exception(err)
             print(f"Created MedicationRequest with ID: {response.get('id')}")
+
+        # Update procedure references to use server-assigned IDs
+        for procedure in procedures:
+            # Update patient reference
+            original_patient_id = procedure['subject']['reference'].split('/')[1]
+            server_patient_id = patient_id_map[original_patient_id]
+            procedure['subject']['reference'] = f"Patient/{server_patient_id}"
+
+            # Update practitioner reference
+            original_practitioner_id = procedure['performer'][0]['actor']['reference'].split('/')[1]
+            server_practitioner_id = practitioner_id_map[original_practitioner_id]
+            procedure['performer'][0]['actor']['reference'] = f"Practitioner/{server_practitioner_id}"
+
+        # Create procedures with updated references
+        for procedure in procedures:
+            response = fhir_request.create("Procedure", procedure)
+            if response.get('issue') and response['issue'][0]['severity'] == 'error':
+                err = response['issue'][0]['diagnostics']
+                print(err)
+                raise Exception(err)
+            print(f"Created Procedure with ID: {response.get('id')}")
 
 
 if __name__ == "__main__":
