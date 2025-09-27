@@ -10,6 +10,7 @@ from typing import Dict, Any, Tuple
 
 from lib.data.specialties import PRACTITIONER_SPECIALTIES
 from lib.data.icd import CONDITIONS_ICD10
+from lib.data.encounter_reasons import ENCOUNTER_REASON_CODES
 
 # Initialize Faker to generate random data
 fake = Faker()
@@ -193,6 +194,9 @@ def generate_appointment(patient_id: str, practitioner_id: str, location_id: str
     appointment_id = str(uuid.uuid4())
     start_time = fake.date_time_this_month(before_now=False, after_now=True)
     end_time = start_time + timedelta(minutes=random.choice([15, 30, 45]))
+    
+    # Select a random encounter reason
+    reason_code = random.choice(ENCOUNTER_REASON_CODES)
 
     return {
         "resourceType": "Appointment",
@@ -202,6 +206,20 @@ def generate_appointment(patient_id: str, practitioner_id: str, location_id: str
         "start": start_time.isoformat(),
         "end": end_time.isoformat(),
         "created": datetime.now().isoformat(),
+        "reason": [
+            {
+                "concept": {
+                    "coding": [
+                        {
+                            "system": reason_code["system"],
+                            "code": reason_code["code"],
+                            "display": reason_code["display"]
+                        }
+                    ],
+                    "text": reason_code["display"]
+                }
+            }
+        ],
         "participant": [
             {
                 "actor": {"reference": f"Patient/{patient_id}"},
