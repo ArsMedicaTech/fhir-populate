@@ -4,3 +4,6 @@
 .env
 
 fhir_dummy_data.json
+
+loinc/
+loinc.json
