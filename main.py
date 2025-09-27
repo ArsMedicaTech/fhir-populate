@@ -18,7 +18,7 @@ from lib.resources.observation import generate_observation
 from lib.resources.patient import generate_patient
 from lib.resources.practitioner import generate_practitioner
 from lib.resources.procedure import generate_procedure
-from lib.diagnostic_report_generator import generate_diagnostic_report
+from lib.resources.diagnostic_report import generate_diagnostic_report
 
 
 class FHIRServerConfig:
