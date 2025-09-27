@@ -111,6 +111,17 @@ def generate_family_member_history(patient_id: str, practitioner_id: str = None)
         # Generate onset age
         min_onset_age = max(age_range[0], 1)
         max_onset_age = min(age_range[1], current_age - 1)
+        
+        # Ensure we have a valid range
+        if min_onset_age > max_onset_age:
+            min_onset_age = max(1, current_age - 10)
+            max_onset_age = current_age - 1
+        
+        # If still invalid, use a default range
+        if min_onset_age > max_onset_age:
+            min_onset_age = 1
+            max_onset_age = current_age - 1 if current_age > 1 else 1
+        
         onset_age = random.randint(min_onset_age, max_onset_age)
         
         condition_entry = {
