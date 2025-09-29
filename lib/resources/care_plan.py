@@ -53,7 +53,7 @@ def generate_care_plan(patient_id: str, practitioner_id: str, encounter_id: Opti
     # Generate 1-3 goals
     num_goals = random.randint(1, 3)
     selected_goals = random.sample(CARE_PLAN_GOALS, num_goals)
-    goals = [{"reference": f"Goal/{str(uuid.uuid4())}"} for _ in selected_goals]
+    goals = [{"description": {"text": goal}} for goal in selected_goals]
     
     # Generate 2-5 activities
     num_activities = random.randint(2, 5)
@@ -164,11 +164,6 @@ def generate_care_plan(patient_id: str, practitioner_id: str, encounter_id: Opti
             "reference": f"Practitioner/{practitioner_id}",
             "display": f"Dr. {fake.last_name()}"
         },
-        "careTeam": [
-            {
-                "reference": f"CareTeam/{str(uuid.uuid4())}"
-            }
-        ],
         "addresses": [
             {
                 "reference": {

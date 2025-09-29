@@ -87,8 +87,8 @@ def generate_diagnostic_report(patient_id: str, practitioner_id: str, encounter_
         "issued": issued_date.isoformat(),
         "performer": [
             {
-                "reference": f"Organization/{str(uuid.uuid4())}",
-                "display": laboratory_name
+                "reference": f"Practitioner/{practitioner_id}",
+                "display": f"Dr. {pathologist_name}"
             }
         ],
         "result": result_references,

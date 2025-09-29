@@ -5,7 +5,6 @@ Includes impression types, findings, and clinical descriptions.
 
 # Clinical impression statuses
 CLINICAL_IMPESSION_STATUSES = [
-    "draft",
     "in-progress", 
     "completed",
     "entered-in-error"

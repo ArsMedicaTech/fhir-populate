@@ -18,8 +18,7 @@ CARE_PLAN_INTENTS = [
     "proposal",
     "plan",
     "order",
-    "option",
-    "directive"
+    "option"
 ]
 
 # Care plan categories

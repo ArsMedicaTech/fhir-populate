@@ -140,14 +140,7 @@ def generate_clinical_impression(patient_id: str, practitioner_id: str, encounte
             <p><b>date</b>: {date.strftime('%Y-%m-%dT%H:%M:%S%z')}</p>
             <p><b>performer</b>: <a href="practitioner-{practitioner_id}.html">Practitioner/{practitioner_id}</a></p>
             <p><b>problem</b>: <span>: {problem}</span></p>
-            <p><b>summary</b>: <span title="
-   <investigation>
-    <code>
-      <text value=\"{investigation_type}\"/>
-    </code>
-    {investigation_items_html}
-  </investigation>
-   ">{summary}</span></p>
+            <p><b>summary</b>: <span title="Investigation: {investigation_type} - {', '.join(investigation_findings)}">{summary}</span></p>
             <blockquote>
                 <p><b>finding</b></p>
                 <h3>Items</h3>

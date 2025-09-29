@@ -71,7 +71,6 @@ def generate_immunization(patient_id: str, practitioner_id: str, encounter_id: s
             "text": vaccine["text"]
         },
         "manufacturer": {
-            "reference": manufacturer["reference"],
             "display": manufacturer["display"]
         },
         "lotNumber": lot_number,
@@ -191,11 +190,7 @@ def generate_immunization(patient_id: str, practitioner_id: str, encounter_id: s
             <p><b>identifier</b>: id: {identifier_value}</p>
             <p><b>status</b>: {status}</p>
             <p><b>vaccineCode</b>: {vaccine['text']} <span style="background: LightGoldenRodYellow; margin: 4px; border: 1px solid khaki"> (<a href="http://terminology.hl7.org/5.1.0/CodeSystem-CVX.html">Vaccine Administered Code Set (CVX)</a>#{vaccine['code']})</span></p>
-            <h3>Manufacturers</h3>
-            <table class="grid">
-                <tr><td>-</td><td><b>Reference</b></td></tr>
-                <tr><td>*</td><td><a href="organization-{manufacturer['reference'].split('/')[-1]}.html">{manufacturer['reference']}</a> &quot;{manufacturer['display']}&quot;</td></tr>
-            </table>
+            <p><b>manufacturer</b>: {manufacturer['display'].replace('&', '&amp;')}</p>
             <p><b>lotNumber</b>: {lot_number}</p>
             <p><b>expirationDate</b>: {expiration_date.strftime('%Y-%m-%d')}</p>
             <p><b>patient</b>: <a href="patient-{patient_id}.html">Patient/{patient_id}</a></p>
