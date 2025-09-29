@@ -420,15 +420,6 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
             original_practitioner_id = medication_request['requester']['reference'].split('/')[1]
             server_practitioner_id = practitioner_id_map[original_practitioner_id]
             medication_request['requester']['reference'] = f"Practitioner/{server_practitioner_id}"
-        
-        # Create medication requests with updated references
-        for medication_request in medication_requests:
-            response = fhir_request.create("MedicationRequest", medication_request)
-            if response.get('issue') and response['issue'][0]['severity'] == 'error':
-                err = response['issue'][0]['diagnostics']
-                print(err)
-                raise Exception(err)
-            print(f"Created MedicationRequest with ID: {response.get('id')}")
 
         # Update procedure references to use server-assigned IDs
         for procedure in procedures:
@@ -464,15 +455,6 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
                 server_practitioner_id = practitioner_id_map[original_practitioner_id]
                 observation['performer'][0]['reference'] = f"Practitioner/{server_practitioner_id}"
 
-        # Create observations with updated references
-        for observation in observations:
-            response = fhir_request.create("Observation", observation)
-            if response.get('issue') and response['issue'][0]['severity'] == 'error':
-                err = response['issue'][0]['diagnostics']
-                print(err)
-                raise Exception(err)
-            print(f"Created Observation with ID: {response.get('id')}")
-
         # Update encounter references to use server-assigned IDs
         for encounter in encounters:
             # Update patient reference
@@ -495,14 +477,318 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
             server_organization_id = organization_id_map[original_organization_id]
             encounter['serviceProvider']['reference'] = f"Organization/{server_organization_id}"
 
-        # Create encounters with updated references
+        # Create encounters with updated references and store their server-assigned IDs
+        encounter_id_map = {}
         for encounter in encounters:
             response = fhir_request.create("Encounter", encounter)
             if response.get('issue') and response['issue'][0]['severity'] == 'error':
                 err = response['issue'][0]['diagnostics']
                 print(err)
                 raise Exception(err)
-            print(f"Created Encounter with ID: {response.get('id')}")
+            server_id = response.get('id')
+            encounter_id_map[encounter['id']] = server_id
+            print(f"Created Encounter with ID: {server_id}")
+
+        # Create observations with updated references and store their server-assigned IDs
+        observation_id_map = {}
+        for observation in observations:
+            response = fhir_request.create("Observation", observation)
+            if response.get('issue') and response['issue'][0]['severity'] == 'error':
+                err = response['issue'][0]['diagnostics']
+                print(err)
+                raise Exception(err)
+            server_id = response.get('id')
+            observation_id_map[observation['id']] = server_id
+            print(f"Created Observation with ID: {server_id}")
+
+        # Create medication requests with updated references and store their server-assigned IDs
+        medication_request_id_map = {}
+        for medication_request in medication_requests:
+            response = fhir_request.create("MedicationRequest", medication_request)
+            if response.get('issue') and response['issue'][0]['severity'] == 'error':
+                err = response['issue'][0]['diagnostics']
+                print(err)
+                raise Exception(err)
+            server_id = response.get('id')
+            medication_request_id_map[medication_request['id']] = server_id
+            print(f"Created MedicationRequest with ID: {server_id}")
+
+        # Update diagnostic report references to use server-assigned IDs
+        for diagnostic_report in diagnostic_reports:
+            # Update patient reference
+            original_patient_id = diagnostic_report['subject']['reference'].split('/')[1]
+            server_patient_id = patient_id_map[original_patient_id]
+            diagnostic_report['subject']['reference'] = f"Patient/{server_patient_id}"
+
+            # Update practitioner reference
+            original_practitioner_id = diagnostic_report['performer'][0]['reference'].split('/')[1]
+            if original_practitioner_id in practitioner_id_map:
+                server_practitioner_id = practitioner_id_map[original_practitioner_id]
+                diagnostic_report['performer'][0]['reference'] = f"Practitioner/{server_practitioner_id}"
+
+            # Update encounter reference
+            original_encounter_id = diagnostic_report['encounter']['reference'].split('/')[1]
+            server_encounter_id = encounter_id_map.get(original_encounter_id)
+            if server_encounter_id:
+                diagnostic_report['encounter']['reference'] = f"Encounter/{server_encounter_id}"
+
+            # Update observation references
+            for result in diagnostic_report.get('result', []):
+                original_obs_id = result['reference'].split('/')[1]
+                server_obs_id = observation_id_map.get(original_obs_id)
+                if server_obs_id:
+                    result['reference'] = f"Observation/{server_obs_id}"
+
+        # Create diagnostic reports with updated references
+        for diagnostic_report in diagnostic_reports:
+            response = fhir_request.create("DiagnosticReport", diagnostic_report)
+            if response.get('issue') and response['issue'][0]['severity'] == 'error':
+                err = response['issue'][0]['diagnostics']
+                print(err)
+                raise Exception(err)
+            print(f"Created DiagnosticReport with ID: {response.get('id')}")
+
+        # Update service request references to use server-assigned IDs
+        for service_request in service_requests:
+            # Update patient reference
+            original_patient_id = service_request['subject']['reference'].split('/')[1]
+            server_patient_id = patient_id_map[original_patient_id]
+            service_request['subject']['reference'] = f"Patient/{server_patient_id}"
+
+            # Update practitioner reference
+            original_practitioner_id = service_request['requester']['reference'].split('/')[1]
+            if original_practitioner_id in practitioner_id_map:
+                server_practitioner_id = practitioner_id_map[original_practitioner_id]
+                service_request['requester']['reference'] = f"Practitioner/{server_practitioner_id}"
+
+            # Update encounter reference if present
+            if 'encounter' in service_request:
+                original_encounter_id = service_request['encounter']['reference'].split('/')[1]
+                server_encounter_id = encounter_id_map.get(original_encounter_id)
+                if server_encounter_id:
+                    service_request['encounter']['reference'] = f"Encounter/{server_encounter_id}"
+
+        # Create service requests with updated references
+        for service_request in service_requests:
+            response = fhir_request.create("ServiceRequest", service_request)
+            if response.get('issue') and response['issue'][0]['severity'] == 'error':
+                err = response['issue'][0]['diagnostics']
+                print(err)
+                raise Exception(err)
+            print(f"Created ServiceRequest with ID: {response.get('id')}")
+
+        # Update clinical impression references to use server-assigned IDs
+        for clinical_impression in clinical_impressions:
+            # Update patient reference
+            original_patient_id = clinical_impression['subject']['reference'].split('/')[1]
+            server_patient_id = patient_id_map[original_patient_id]
+            clinical_impression['subject']['reference'] = f"Patient/{server_patient_id}"
+
+            # Update practitioner reference
+            original_practitioner_id = clinical_impression['performer']['reference'].split('/')[1]
+            if original_practitioner_id in practitioner_id_map:
+                server_practitioner_id = practitioner_id_map[original_practitioner_id]
+                clinical_impression['performer']['reference'] = f"Practitioner/{server_practitioner_id}"
+
+            # Update encounter reference if present
+            if 'encounter' in clinical_impression:
+                original_encounter_id = clinical_impression['encounter']['reference'].split('/')[1]
+                server_encounter_id = encounter_id_map.get(original_encounter_id)
+                if server_encounter_id:
+                    clinical_impression['encounter']['reference'] = f"Encounter/{server_encounter_id}"
+
+        # Create clinical impressions with updated references
+        for clinical_impression in clinical_impressions:
+            response = fhir_request.create("ClinicalImpression", clinical_impression)
+            if response.get('issue') and response['issue'][0]['severity'] == 'error':
+                err = response['issue'][0]['diagnostics']
+                print(err)
+                raise Exception(err)
+            print(f"Created ClinicalImpression with ID: {response.get('id')}")
+
+        # Update family member history references to use server-assigned IDs
+        for family_member_history in family_member_histories:
+            # Update patient reference
+            original_patient_id = family_member_history['patient']['reference'].split('/')[1]
+            server_patient_id = patient_id_map[original_patient_id]
+            family_member_history['patient']['reference'] = f"Patient/{server_patient_id}"
+
+            # Update practitioner reference if present
+            if 'recorder' in family_member_history:
+                original_practitioner_id = family_member_history['recorder']['reference'].split('/')[1]
+                if original_practitioner_id in practitioner_id_map:
+                    server_practitioner_id = practitioner_id_map[original_practitioner_id]
+                    family_member_history['recorder']['reference'] = f"Practitioner/{server_practitioner_id}"
+
+        # Create family member histories with updated references
+        for family_member_history in family_member_histories:
+            response = fhir_request.create("FamilyMemberHistory", family_member_history)
+            if response.get('issue') and response['issue'][0]['severity'] == 'error':
+                err = response['issue'][0]['diagnostics']
+                print(err)
+                raise Exception(err)
+            print(f"Created FamilyMemberHistory with ID: {response.get('id')}")
+
+        # Update immunization references to use server-assigned IDs
+        for immunization in immunizations:
+            # Update patient reference
+            original_patient_id = immunization['patient']['reference'].split('/')[1]
+            server_patient_id = patient_id_map[original_patient_id]
+            immunization['patient']['reference'] = f"Patient/{server_patient_id}"
+
+            # Update practitioner references
+            for performer in immunization.get('performer', []):
+                original_practitioner_id = performer['actor']['reference'].split('/')[1]
+                if original_practitioner_id in practitioner_id_map:
+                    server_practitioner_id = practitioner_id_map[original_practitioner_id]
+                    performer['actor']['reference'] = f"Practitioner/{server_practitioner_id}"
+
+            # Update encounter reference if present
+            if 'encounter' in immunization:
+                original_encounter_id = immunization['encounter']['reference'].split('/')[1]
+                server_encounter_id = encounter_id_map.get(original_encounter_id)
+                if server_encounter_id:
+                    immunization['encounter']['reference'] = f"Encounter/{server_encounter_id}"
+
+            # Update location reference if present
+            if 'location' in immunization:
+                original_location_id = immunization['location']['reference'].split('/')[1]
+                server_location_id = location_id_map[original_location_id]
+                immunization['location']['reference'] = f"Location/{server_location_id}"
+
+        # Create immunizations with updated references
+        for immunization in immunizations:
+            response = fhir_request.create("Immunization", immunization)
+            if response.get('issue') and response['issue'][0]['severity'] == 'error':
+                err = response['issue'][0]['diagnostics']
+                print(err)
+                raise Exception(err)
+            print(f"Created Immunization with ID: {response.get('id')}")
+
+        # Update medication administration references to use server-assigned IDs
+        for medication_administration in medication_administrations:
+            # Update patient reference
+            original_patient_id = medication_administration['subject']['reference'].split('/')[1]
+            server_patient_id = patient_id_map[original_patient_id]
+            medication_administration['subject']['reference'] = f"Patient/{server_patient_id}"
+
+            # Update practitioner reference
+            original_practitioner_id = medication_administration['performer'][0]['actor']['reference']['reference'].split('/')[1]
+            if original_practitioner_id in practitioner_id_map:
+                server_practitioner_id = practitioner_id_map[original_practitioner_id]
+                medication_administration['performer'][0]['actor']['reference']['reference'] = f"Practitioner/{server_practitioner_id}"
+
+            # Update encounter reference if present
+            if 'encounter' in medication_administration:
+                original_encounter_id = medication_administration['encounter']['reference'].split('/')[1]
+                server_encounter_id = encounter_id_map.get(original_encounter_id)
+                if server_encounter_id:
+                    medication_administration['encounter']['reference'] = f"Encounter/{server_encounter_id}"
+
+            # Update medication request reference if present
+            if 'request' in medication_administration:
+                original_med_req_id = medication_administration['request']['reference'].split('/')[1]
+                server_med_req_id = medication_request_id_map.get(original_med_req_id)
+                if server_med_req_id:
+                    medication_administration['request']['reference'] = f"MedicationRequest/{server_med_req_id}"
+
+        # Create medication administrations with updated references
+        for medication_administration in medication_administrations:
+            response = fhir_request.create("MedicationAdministration", medication_administration)
+            if response.get('issue') and response['issue'][0]['severity'] == 'error':
+                err = response['issue'][0]['diagnostics']
+                print(err)
+                raise Exception(err)
+            print(f"Created MedicationAdministration with ID: {response.get('id')}")
+
+        # Update allergy intolerance references to use server-assigned IDs
+        for allergy_intolerance in allergy_intolerances:
+            # Update patient reference
+            original_patient_id = allergy_intolerance['patient']['reference'].split('/')[1]
+            server_patient_id = patient_id_map[original_patient_id]
+            allergy_intolerance['patient']['reference'] = f"Patient/{server_patient_id}"
+
+            # Update practitioner reference if present
+            if 'recorder' in allergy_intolerance:
+                original_practitioner_id = allergy_intolerance['recorder']['reference'].split('/')[1]
+                if original_practitioner_id in practitioner_id_map:
+                    server_practitioner_id = practitioner_id_map[original_practitioner_id]
+                    allergy_intolerance['recorder']['reference'] = f"Practitioner/{server_practitioner_id}"
+
+        # Create allergy intolerances with updated references
+        for allergy_intolerance in allergy_intolerances:
+            response = fhir_request.create("AllergyIntolerance", allergy_intolerance)
+            if response.get('issue') and response['issue'][0]['severity'] == 'error':
+                err = response['issue'][0]['diagnostics']
+                print(err)
+                raise Exception(err)
+            print(f"Created AllergyIntolerance with ID: {response.get('id')}")
+
+        # Update care plan references to use server-assigned IDs
+        for care_plan in care_plans:
+            # Update patient reference
+            original_patient_id = care_plan['subject']['reference'].split('/')[1]
+            server_patient_id = patient_id_map[original_patient_id]
+            care_plan['subject']['reference'] = f"Patient/{server_patient_id}"
+
+            # Update practitioner reference
+            original_practitioner_id = care_plan['custodian']['reference'].split('/')[1]
+            if original_practitioner_id in practitioner_id_map:
+                server_practitioner_id = practitioner_id_map[original_practitioner_id]
+                care_plan['custodian']['reference'] = f"Practitioner/{server_practitioner_id}"
+
+            # Update encounter reference if present
+            if 'encounter' in care_plan:
+                original_encounter_id = care_plan['encounter']['reference'].split('/')[1]
+                server_encounter_id = encounter_id_map.get(original_encounter_id)
+                if server_encounter_id:
+                    care_plan['encounter']['reference'] = f"Encounter/{server_encounter_id}"
+
+            # Update contained condition reference if present
+            for contained in care_plan.get('contained', []):
+                if contained.get('resourceType') == 'Condition':
+                    original_patient_id = contained['subject']['reference'].split('/')[1]
+                    server_patient_id = patient_id_map[original_patient_id]
+                    contained['subject']['reference'] = f"Patient/{server_patient_id}"
+
+        # Create care plans with updated references
+        for care_plan in care_plans:
+            response = fhir_request.create("CarePlan", care_plan)
+            if response.get('issue') and response['issue'][0]['severity'] == 'error':
+                err = response['issue'][0]['diagnostics']
+                print(err)
+                raise Exception(err)
+            print(f"Created CarePlan with ID: {response.get('id')}")
+
+        # Update coverage references to use server-assigned IDs
+        for coverage in coverages:
+            # Update patient references
+            original_patient_id = coverage['subscriber']['reference'].split('/')[1]
+            server_patient_id = patient_id_map[original_patient_id]
+            coverage['subscriber']['reference'] = f"Patient/{server_patient_id}"
+            coverage['beneficiary']['reference'] = f"Patient/{server_patient_id}"
+
+            # Update organization reference
+            original_org_id = coverage['policyHolder']['reference'].split('/')[1]
+            if original_org_id in organization_id_map:
+                server_org_id = organization_id_map[original_org_id]
+                coverage['policyHolder']['reference'] = f"Organization/{server_org_id}"
+                coverage['insurer']['reference'] = f"Organization/{server_org_id}"
+
+            # Update policy holder reference if different from patient
+            if 'policyHolder' in coverage and coverage['policyHolder']['reference'].startswith('Patient/'):
+                original_policy_holder_id = coverage['policyHolder']['reference'].split('/')[1]
+                server_policy_holder_id = patient_id_map[original_policy_holder_id]
+                coverage['policyHolder']['reference'] = f"Patient/{server_policy_holder_id}"
+
+        # Create coverages with updated references
+        for coverage in coverages:
+            response = fhir_request.create("Coverage", coverage)
+            if response.get('issue') and response['issue'][0]['severity'] == 'error':
+                err = response['issue'][0]['diagnostics']
+                print(err)
+                raise Exception(err)
+            print(f"Created Coverage with ID: {response.get('id')}")
 
 
 if __name__ == "__main__":
