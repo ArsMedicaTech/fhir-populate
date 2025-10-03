@@ -892,7 +892,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
         
         try:
             # Get a sample of appointments from the server
-            search_response = fhir_request.send_latest("Appointment", "_search")
+            search_response = fhir_request.search("Appointment")
             if 'entry' in search_response and search_response['entry']:
                 sample_size = min(3, len(search_response['entry']))
                 print(f"Checking {sample_size} appointments from the server...")
