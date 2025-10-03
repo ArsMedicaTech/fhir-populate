@@ -437,6 +437,22 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
             for j, participant in enumerate(appointment['participant']):
                 print(f"  Participant {j+1}: {participant['actor']['reference']} (status: {participant['status']})")
             
+            # Debug: Print reason field before sending (version-aware)
+            if 'reasonCode' in appointment:
+                print(f"Appointment reasonCode before creation (FHIR R4):")
+                for j, reason in enumerate(appointment['reasonCode']):
+                    if 'coding' in reason:
+                        coding = reason['coding'][0]
+                        print(f"  Reason {j+1}: {coding['display']} (Code: {coding['code']}, System: {coding['system']})")
+            elif 'reason' in appointment:
+                print(f"Appointment reason before creation (FHIR R5):")
+                for j, reason in enumerate(appointment['reason']):
+                    if 'concept' in reason and 'coding' in reason['concept']:
+                        coding = reason['concept']['coding'][0]
+                        print(f"  Reason {j+1}: {coding['display']} (Code: {coding['code']}, System: {coding['system']})")
+            else:
+                print("WARNING: No reason field found in appointment!")
+            
             response = fhir_request.create("Appointment", appointment)
             
             # Enhanced error handling - check for any issues, not just errors
@@ -465,6 +481,23 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
                             print(f"  Participant {j+1}: {participant['actor']['reference']} (status: {participant['status']})")
                     else:
                         print("WARNING: No participants found in stored appointment!")
+                    
+                    # Debug: Check if reason field was stored (version-aware)
+                    if 'reasonCode' in created_appointment:
+                        print(f"Verification - Stored reasonCode field (FHIR R4):")
+                        for j, reason in enumerate(created_appointment['reasonCode']):
+                            if 'coding' in reason:
+                                coding = reason['coding'][0]
+                                print(f"  Reason {j+1}: {coding['display']} (Code: {coding['code']}, System: {coding['system']})")
+                    elif 'reason' in created_appointment:
+                        print(f"Verification - Stored reason field (FHIR R5):")
+                        for j, reason in enumerate(created_appointment['reason']):
+                            if 'concept' in reason and 'coding' in reason['concept']:
+                                coding = reason['concept']['coding'][0]
+                                print(f"  Reason {j+1}: {coding['display']} (Code: {coding['code']}, System: {coding['system']})")
+                    else:
+                        print("WARNING: No reason field found in stored appointment!")
+                        print(f"Available fields in stored appointment: {list(created_appointment.keys())}")
                 except Exception as e:
                     print(f"Could not verify stored appointment: {e}")
             else:

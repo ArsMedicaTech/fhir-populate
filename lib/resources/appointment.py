@@ -1,8 +1,18 @@
 """
 Module to generate FHIR Appointment resources with realistic data.
+
+This module supports both FHIR R4 and R5 versions. The version is determined by the
+FHIR_VERSION environment variable:
+- Set FHIR_VERSION=R4 for FHIR R4 (default)
+- Set FHIR_VERSION=R5 for FHIR R5
+
+The main difference is in the reason field structure:
+- FHIR R4: Uses 'reasonCode' with CodeableConcept
+- FHIR R5: Uses 'reason' with CodeableReference
 """
 import uuid
 import random
+import os
 from datetime import datetime, timedelta
 from faker import Faker
 
@@ -13,6 +23,19 @@ from lib.data.encounter_reasons import ENCOUNTER_REASON_CODES
 
 # Initialize Faker to generate random data
 fake = Faker()
+
+
+def get_fhir_version() -> str:
+    """
+    Get the FHIR version from environment variable or default to R4.
+    
+    :return: FHIR version string ('R4' or 'R5')
+    """
+    fhir_version = os.getenv('FHIR_VERSION', 'R4').upper()
+    if fhir_version not in ['R4', 'R5']:
+        print(f"Warning: Invalid FHIR_VERSION '{fhir_version}', defaulting to R4")
+        fhir_version = 'R4'
+    return fhir_version
 
 
 def generate_appointment(patient_id: str, practitioner_id: str, location_id: str) -> Dict[str, Any]:
@@ -30,8 +53,12 @@ def generate_appointment(patient_id: str, practitioner_id: str, location_id: str
 
     # Select a random encounter reason
     reason_code = random.choice(ENCOUNTER_REASON_CODES)
-
-    return {
+    
+    # Get FHIR version to determine reason field structure
+    fhir_version = get_fhir_version()
+    
+    # Create base appointment structure
+    appointment = {
         "resourceType": "Appointment",
         "id": appointment_id,
         "status": random.choice(["booked", "fulfilled", "cancelled"]),
@@ -39,20 +66,6 @@ def generate_appointment(patient_id: str, practitioner_id: str, location_id: str
         "start": start_time.isoformat(),
         "end": end_time.isoformat(),
         "created": datetime.now().isoformat(),
-        "reason": [
-            {
-                "concept": {
-                    "coding": [
-                        {
-                            "system": reason_code["system"],
-                            "code": reason_code["code"],
-                            "display": reason_code["display"]
-                        }
-                    ],
-                    "text": reason_code["display"]
-                }
-            }
-        ],
         "participant": [
             {
                 "actor": {"reference": f"Patient/{patient_id}"},
@@ -68,3 +81,37 @@ def generate_appointment(patient_id: str, practitioner_id: str, location_id: str
             }
         ]
     }
+    
+    # Add reason field based on FHIR version
+    if fhir_version == "R4":
+        # FHIR R4 uses reasonCode with CodeableConcept
+        appointment["reasonCode"] = [
+            {
+                "coding": [
+                    {
+                        "system": reason_code["system"],
+                        "code": reason_code["code"],
+                        "display": reason_code["display"]
+                    }
+                ],
+                "text": reason_code["display"]
+            }
+        ]
+    else:  # FHIR R5
+        # FHIR R5 uses reason with CodeableReference
+        appointment["reason"] = [
+            {
+                "concept": {
+                    "coding": [
+                        {
+                            "system": reason_code["system"],
+                            "code": reason_code["code"],
+                            "display": reason_code["display"]
+                        }
+                    ],
+                    "text": reason_code["display"]
+                }
+            }
+        ]
+    
+    return appointment
