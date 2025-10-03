@@ -115,3 +115,21 @@ class Request:
         response = requests.delete(f"http://{self.host}:{self.port}{self.path}/{resource}/{_id}?_format={_format}",
                                    headers=headers)
         return response.json() if response.content else {"status": response.status_code}
+
+    def search(self, resource: str, params: str = "", _format: str = 'json', _pretty: bool = True):
+        """
+        Search for resources.
+        :param resource: The resource type to search.
+        :param params: Search parameters as a query string.
+        :param _format: The format for the response (default: 'json').
+        :param _pretty: Whether to pretty-print the response (default: True).
+        """
+        headers = self.headers.copy()
+        headers["Accept"] = headers["Accept"].format(_format=_format)
+
+        url = f"http://{self.host}:{self.port}{self.path}/{resource}?_format={_format}&_pretty={_pretty}"
+        if params:
+            url += f"&{params}"
+
+        response = requests.get(url, headers=headers)
+        return response.json()
