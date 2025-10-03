@@ -1,6 +1,7 @@
 """
 Some helper scripts for generating FHIR data for testing environments.
 """
+import time
 import random
 from faker import Faker
 
@@ -27,6 +28,9 @@ from lib.resources.medication_administration import generate_medication_administ
 from lib.resources.allergy_intolerance import generate_allergy_intolerance
 from lib.resources.care_plan import generate_care_plan
 from lib.resources.coverage import generate_coverage
+
+
+FINAL_VERIFICATION_CHECK_WAIT_TIME = 30
 
 
 class FHIRServerConfig:
@@ -888,6 +892,11 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
         # Final verification: Check a few appointments to ensure participants are stored
         print("\n" + "="*60)
         print("FINAL VERIFICATION: Checking stored appointments for participants")
+
+        for i in range(FINAL_VERIFICATION_CHECK_WAIT_TIME):
+            print(f"Waiting {FINAL_VERIFICATION_CHECK_WAIT_TIME - i} seconds before verification...")
+            time.sleep(1)
+
         print("="*60)
         
         try:
