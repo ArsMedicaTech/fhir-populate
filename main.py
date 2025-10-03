@@ -314,6 +314,36 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
     if fhir_server:
         fhir_request = Request(host=fhir_server.host, port=fhir_server.port, path=fhir_server.path)
         
+        # Test FHIR server connectivity and appointment creation
+        print("Testing FHIR server connectivity...")
+        try:
+            # Test with a simple appointment first
+            test_appointment = {
+                "resourceType": "Appointment",
+                "status": "booked",
+                "description": "Test appointment",
+                "start": "2024-01-01T10:00:00Z",
+                "end": "2024-01-01T10:30:00Z",
+                "participant": [
+                    {
+                        "actor": {"reference": "Patient/test-patient"},
+                        "status": "accepted"
+                    }
+                ]
+            }
+            
+            test_response = fhir_request.create("Appointment", test_appointment)
+            if test_response.get('issue'):
+                print("WARNING: FHIR server returned issues with test appointment:")
+                for issue in test_response['issue']:
+                    print(f"  - {issue.get('severity', 'unknown')}: {issue.get('diagnostics', 'No details')}")
+            else:
+                print("✓ FHIR server connectivity test passed")
+                
+        except Exception as e:
+            print(f"WARNING: FHIR server connectivity test failed: {e}")
+            print("Continuing with data generation...")
+        
         # Create organizations first and store their server-assigned IDs
         organization_id_map = {}
         for i, clinic in enumerate(clinics):
@@ -401,13 +431,45 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
             appointment['participant'][2]['actor']['reference'] = f"Location/{server_location_id}"
         
         # Create appointments with updated references
-        for appointment in appointments:
+        for i, appointment in enumerate(appointments):
+            print(f"\n--- Creating Appointment {i+1}/{len(appointments)} ---")
+            print(f"Appointment participants before creation:")
+            for j, participant in enumerate(appointment['participant']):
+                print(f"  Participant {j+1}: {participant['actor']['reference']} (status: {participant['status']})")
+            
             response = fhir_request.create("Appointment", appointment)
-            if response.get('issue') and response['issue'][0]['severity'] == 'error':
-                err = response['issue'][0]['diagnostics']
-                print(err)
-                raise Exception(err)
-            print(f"Created Appointment with ID: {response.get('id')}")
+            
+            # Enhanced error handling - check for any issues, not just errors
+            if response.get('issue'):
+                for issue in response['issue']:
+                    severity = issue.get('severity', 'unknown')
+                    diagnostics = issue.get('diagnostics', 'No details provided')
+                    print(f"FHIR Server Issue - Severity: {severity}, Details: {diagnostics}")
+                    
+                    if severity == 'error':
+                        print(f"ERROR: Failed to create appointment due to: {diagnostics}")
+                        raise Exception(f"Appointment creation failed: {diagnostics}")
+                    elif severity == 'warning':
+                        print(f"WARNING: Appointment created with warnings: {diagnostics}")
+            
+            # Verify the created appointment has participants
+            if response.get('id'):
+                print(f"Created Appointment with ID: {response['id']}")
+                
+                # Fetch the created appointment to verify participants were stored
+                try:
+                    created_appointment = fhir_request.send_latest("Appointment", response['id'])
+                    if 'participant' in created_appointment:
+                        print(f"Verification - Stored participants:")
+                        for j, participant in enumerate(created_appointment['participant']):
+                            print(f"  Participant {j+1}: {participant['actor']['reference']} (status: {participant['status']})")
+                    else:
+                        print("WARNING: No participants found in stored appointment!")
+                except Exception as e:
+                    print(f"Could not verify stored appointment: {e}")
+            else:
+                print("ERROR: No ID returned from appointment creation")
+                print(f"Full response: {response}")
         
         # Update medication request references to use server-assigned IDs
         for medication_request in medication_requests:
@@ -789,6 +851,39 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
                 print(err)
                 raise Exception(err)
             print(f"Created Coverage with ID: {response.get('id')}")
+        
+        # Final verification: Check a few appointments to ensure participants are stored
+        print("\n" + "="*60)
+        print("FINAL VERIFICATION: Checking stored appointments for participants")
+        print("="*60)
+        
+        try:
+            # Get a sample of appointments from the server
+            search_response = fhir_request.send_latest("Appointment", "_search")
+            if 'entry' in search_response and search_response['entry']:
+                sample_size = min(3, len(search_response['entry']))
+                print(f"Checking {sample_size} appointments from the server...")
+                
+                for i in range(sample_size):
+                    appointment = search_response['entry'][i]['resource']
+                    appointment_id = appointment.get('id', 'unknown')
+                    print(f"\nAppointment {i+1} (ID: {appointment_id}):")
+                    
+                    if 'participant' in appointment and appointment['participant']:
+                        print(f"  Found {len(appointment['participant'])} participants:")
+                        for j, participant in enumerate(appointment['participant']):
+                            actor_ref = participant.get('actor', {}).get('reference', 'No reference')
+                            status = participant.get('status', 'No status')
+                            print(f"    Participant {j+1}: {actor_ref} (status: {status})")
+                    else:
+                        print("  WARNING: No participants found in this appointment!")
+                        print(f"  Full appointment structure: {list(appointment.keys())}")
+            else:
+                print("No appointments found in server response")
+                print(f"Search response: {search_response}")
+        except Exception as e:
+            print(f"Could not verify appointments: {e}")
+            print("This might be due to server configuration or search endpoint availability")
 
 
 if __name__ == "__main__":
