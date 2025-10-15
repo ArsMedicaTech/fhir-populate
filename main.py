@@ -8,6 +8,9 @@ from faker import Faker
 import json
 from typing import Optional
 
+import os
+import dotenv
+
 from lib.crud import Request
 
 from lib.resources.appointment import generate_appointment
@@ -28,6 +31,17 @@ from lib.resources.medication_administration import generate_medication_administ
 from lib.resources.allergy_intolerance import generate_allergy_intolerance
 from lib.resources.care_plan import generate_care_plan
 from lib.resources.coverage import generate_coverage
+
+
+dotenv.load_dotenv()
+
+FHIR_HOST = os.getenv("FHIR_HOST", "localhost")
+FHIR_PORT_VAR = os.getenv("FHIR_PORT", "8080")
+if FHIR_PORT_VAR.isdigit():
+    FHIR_PORT = int(FHIR_PORT_VAR)
+else:
+    FHIR_PORT = None
+FHIR_PATH = os.getenv("FHIR_PATH", "/fhir")
 
 
 FINAL_VERIFICATION_CHECK_WAIT_TIME = 30
@@ -929,5 +943,5 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
 
 
 if __name__ == "__main__":
-    main(output_filename="fhir_dummy_data.json", fhir_server=FHIRServerConfig(host="localhost", port=8080, path="/fhir"))
+    main(output_filename="fhir_dummy_data.json", fhir_server=FHIRServerConfig(host=FHIR_HOST, port=FHIR_PORT, path=FHIR_PATH))
 
