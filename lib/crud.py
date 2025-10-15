@@ -15,20 +15,30 @@ class Request:
         "Accept-Encoding": "gzip"
     }
 
-    def __init__(self, host: str, port: int, path: str, header_overrides: Optional[Dict[str, str]] = None) -> None:
+    def __init__(self, host: str, port: Optional[int], path: str, header_overrides: Optional[Dict[str, str]] = None, protocol: str = "http") -> None:
         """
         Initialize the request with host, port, and path.
         :param host: The host for the request.
         :param port: The port for the request.
         :param path: The path for the request.
         :param header_overrides: Optional headers to override the default headers.
+        :param protocol: The protocol to use (default: "http").
         """
         self.host = host
         self.port = port
         self.path = path
+        self.protocol = protocol
 
         if header_overrides:
             self.headers.update(header_overrides)
+
+    @property
+    def port_string(self) -> str:
+        """
+        Get the port string for the request.
+        :return: str - The port string (e.g., ":8080" or "").
+        """
+        return f":{self.port}" if self.port else ""
 
     def send(self, resource: str, _id: str, _version: int, _format: str = 'json', _pretty: bool = True):
         """
@@ -42,7 +52,7 @@ class Request:
         headers["Accept"] = headers["Accept"].format(_format=_format)
 
         response = requests.get(
-            f"http://{self.host}:{self.port}{self.path}/{resource}/{_id}/_history/{_version}?_format={_format}&_pretty={_pretty}",
+            f"{self.protocol}://{self.host}{self.port_string}{self.path}/{resource}/{_id}/_history/{_version}?_format={_format}&_pretty={_pretty}",
             headers=headers)
         return response.json()
 
@@ -58,7 +68,7 @@ class Request:
         headers["Accept"] = headers["Accept"].format(_format=_format)
 
         response = requests.get(
-            f"http://{self.host}:{self.port}{self.path}/{resource}/{_id}?_format={_format}&_pretty={_pretty}",
+            f"{self.protocol}://{self.host}{self.port_string}{self.path}/{resource}/{_id}?_format={_format}&_pretty={_pretty}",
             headers=headers)
         return response.json()
 
@@ -75,7 +85,7 @@ class Request:
         headers["Accept"] = headers["Accept"].format(_format=_format)
 
         response = requests.post(
-            f"http://{self.host}:{self.port}{self.path}/{resource}?_format={_format}&_pretty={_pretty}",
+            f"{self.protocol}://{self.host}{self.port_string}{self.path}/{resource}?_format={_format}&_pretty={_pretty}",
             json=data, headers=headers)
         return response.json()
 
@@ -98,7 +108,7 @@ class Request:
             headers["If-Match"] = if_match
 
         response = requests.put(
-            f"http://{self.host}:{self.port}{self.path}/{resource}/{_id}?_format={_format}&_pretty={_pretty}",
+            f"{self.protocol}://{self.host}{self.port_string}{self.path}/{resource}/{_id}?_format={_format}&_pretty={_pretty}",
             json=data, headers=headers)
         return response.json()
 
@@ -112,7 +122,7 @@ class Request:
         headers = self.headers.copy()
         headers["Accept"] = headers["Accept"].format(_format=_format)
 
-        response = requests.delete(f"http://{self.host}:{self.port}{self.path}/{resource}/{_id}?_format={_format}",
+        response = requests.delete(f"{self.protocol}://{self.host}{self.port_string}{self.path}/{resource}/{_id}?_format={_format}",
                                    headers=headers)
         return response.json() if response.content else {"status": response.status_code}
 
@@ -127,7 +137,7 @@ class Request:
         headers = self.headers.copy()
         headers["Accept"] = headers["Accept"].format(_format=_format)
 
-        url = f"http://{self.host}:{self.port}{self.path}/{resource}?_format={_format}&_pretty={_pretty}"
+        url = f"{self.protocol}://{self.host}{self.port_string}{self.path}/{resource}?_format={_format}&_pretty={_pretty}"
         if params:
             url += f"&{params}"
 
