@@ -870,7 +870,14 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
             if original_org_id in organization_id_map:
                 server_org_id = organization_id_map[original_org_id]
                 coverage['policyHolder']['reference'] = f"Organization/{server_org_id}"
-                coverage['insurer']['reference'] = f"Organization/{server_org_id}"
+                # R4 uses 'payor' (array), R5 uses 'insurer' (single reference)
+                if 'payor' in coverage:
+                    # R4: payor is an array
+                    if coverage['payor'] and coverage['payor'][0].get('reference'):
+                        coverage['payor'][0]['reference'] = f"Organization/{server_org_id}"
+                elif 'insurer' in coverage:
+                    # R5: insurer is a single reference
+                    coverage['insurer']['reference'] = f"Organization/{server_org_id}"
 
             # Update policy holder reference if different from patient
             if 'policyHolder' in coverage and coverage['policyHolder']['reference'].startswith('Patient/'):
