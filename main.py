@@ -8,7 +8,7 @@ from datetime import datetime
 import json
 from typing import Optional
 
-from common import FHIR_HOST, FHIR_PATH, FHIR_PORT, FHIRServerConfig, check_fhir_response
+from common import FHIR_HOST, FHIR_PATH, FHIR_PORT, FINAL_VERIFICATION_CHECK_WAIT_TIME, FHIRServerConfig, check_fhir_response, create_with_validation
 from lib.crud import Request
 
 from lib.resources.appointment import generate_appointment
