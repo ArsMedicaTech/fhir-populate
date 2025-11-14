@@ -24,8 +24,9 @@ def generate_practitioner() -> Dict[str, Any]:
     first_name = fake.first_name()
     last_name = fake.last_name()
     specialty = random.choice(PRACTITIONER_SPECIALTIES)
+    phone_number = fake.phone_number()
 
-    return {
+    practitioner = {
         "resourceType": "Practitioner",
         "id": practitioner_id,
         "name": [{
@@ -45,6 +46,22 @@ def generate_practitioner() -> Dict[str, Any]:
             }
         }],
         "telecom": [
-            {"system": "phone", "value": fake.phone_number(), "use": "work"}
+            {"system": "phone", "value": phone_number, "use": "work"}
         ]
     }
+    
+    # Add text narrative (best practice)
+    practitioner["text"] = {
+        "status": "generated",
+        "div": f"""<div xmlns="http://www.w3.org/1999/xhtml">
+            <p><b>Generated Narrative: Practitioner</b><a name="{practitioner_id}"> </a></p>
+            <div style="display: inline-block; background-color: #d9e0e7; padding: 6px; margin: 4px; border: 1px solid #8da1b4; border-radius: 5px; line-height: 60%">
+                <p style="margin-bottom: 0px">Resource Practitioner &quot;{practitioner_id}&quot; </p>
+            </div>
+            <p><b>name</b>: Dr. {first_name} {last_name}</p>
+            <p><b>qualification</b>: {specialty['display']}</p>
+            <p><b>telecom</b>: {phone_number} (work)</p>
+        </div>"""
+    }
+    
+    return practitioner
