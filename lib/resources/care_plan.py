@@ -52,13 +52,23 @@ def generate_care_plan(patient_id: str, practitioner_id: str, encounter_id: Opti
     # Generate identifier
     identifier_value = f"CP-{fake.random_number(digits=6)}"
     
+    # Get FHIR version to determine field structure
+    fhir_version = get_fhir_version()
+    
     # Generate 1-3 goals
     num_goals = random.randint(1, 3)
     selected_goals = random.sample(CARE_PLAN_GOALS, num_goals)
-    goals = [{"description": {"text": goal}} for goal in selected_goals]
     
-    # Get FHIR version to determine activity structure
-    fhir_version = get_fhir_version()
+    # In R4, goal is a Reference, but we can't reference Goals that don't exist
+    # In R5, goal can have description
+    if fhir_version == "R4":
+        # R4: goal is a Reference, but since we don't create Goal resources,
+        # we'll omit the goal field to avoid validation errors
+        # Alternatively, we could create contained Goal resources, but for simplicity, we'll skip goals
+        goals = []
+    else:  # R5
+        # R5: goal can have description
+        goals = [{"description": {"text": goal}} for goal in selected_goals]
     
     # Generate 2-5 activities
     num_activities = random.randint(2, 5)
@@ -90,10 +100,13 @@ def generate_care_plan(patient_id: str, practitioner_id: str, encounter_id: Opti
             }
             
             # Add outcome if activity is completed
+            # outcomeCodeableConcept must be an array in R4
             if activity_outcome:
-                activity_entry["outcomeCodeableConcept"] = {
-                    "text": activity_outcome
-                }
+                activity_entry["outcomeCodeableConcept"] = [
+                    {
+                        "text": activity_outcome
+                    }
+                ]
         else:  # FHIR R5
             # FHIR R5 CarePlan.activity structure
             activity_entry = {
@@ -195,12 +208,14 @@ def generate_care_plan(patient_id: str, practitioner_id: str, encounter_id: Opti
                 "reference": f"#{contained_condition_id}"
             }
         ],
-        "goal": goals,
         "activity": activities
     }
     
+    # Only add goal if we have goals (R5) or if we want to create contained Goals (R4)
+    if goals:
+        care_plan["goal"] = goals
+    
     # Add version-specific fields
-    fhir_version = get_fhir_version()
     if fhir_version == "R5":
         # FHIR R5 supports description and custodian
         care_plan["description"] = description
