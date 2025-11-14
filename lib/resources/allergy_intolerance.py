@@ -7,6 +7,7 @@ from datetime import timedelta
 from faker import Faker
 from typing import Dict, Any, Optional
 
+from common import get_fhir_version
 from lib.data.allergy_intolerances import (CLINICAL_STATUSES, VERIFICATION_STATUSES, ALLERGY_CATEGORIES,
                                          CRITICALITY_LEVELS, MEDICATION_ALLERGENS, FOOD_ALLERGENS,
                                          ENVIRONMENTAL_ALLERGENS, BIOLOGIC_ALLERGENS, ALLERGY_MANIFESTATIONS,
@@ -49,14 +50,18 @@ def generate_allergy_intolerance(patient_id: str, practitioner_id: Optional[str]
     # Generate recorded date (1-10 years ago)
     recorded_date = fake.date_between(start_date='-10y', end_date='-1d')
     
+    # Get FHIR version to determine field structure
+    fhir_version = get_fhir_version()
+    
     # Generate 1-3 manifestations
     num_manifestations = random.randint(1, 3)
     selected_manifestations = random.sample(ALLERGY_MANIFESTATIONS, num_manifestations)
     
     manifestations = []
     for manifestation in selected_manifestations:
-        manifestations.append({
-            "concept": {
+        if fhir_version == "R4":
+            # FHIR R4: manifestation is CodeableConcept directly
+            manifestations.append({
                 "coding": [
                     {
                         "system": manifestation["system"],
@@ -64,22 +69,25 @@ def generate_allergy_intolerance(patient_id: str, practitioner_id: Optional[str]
                         "display": manifestation["display"]
                     }
                 ]
-            }
-        })
+            })
+        else:  # FHIR R5
+            # FHIR R5: manifestation uses concept wrapper
+            manifestations.append({
+                "concept": {
+                    "coding": [
+                        {
+                            "system": manifestation["system"],
+                            "code": manifestation["code"],
+                            "display": manifestation["display"]
+                        }
+                    ]
+                }
+            })
     
     # Create the allergy intolerance resource
     allergy_intolerance = {
         "resourceType": "AllergyIntolerance",
         "id": allergy_id,
-        "clinicalStatus": {
-            "coding": [
-                {
-                    "system": clinical_status["system"],
-                    "code": clinical_status["code"],
-                    "display": clinical_status["display"]
-                }
-            ]
-        },
         "verificationStatus": {
             "coding": [
                 {
@@ -113,8 +121,20 @@ def generate_allergy_intolerance(patient_id: str, practitioner_id: Optional[str]
         ]
     }
     
-    # Add participant if practitioner provided
-    if practitioner_id:
+    # Add clinicalStatus only if verificationStatus is not "entered-in-error" (constraint ait-2)
+    if verification_status["code"] != "entered-in-error":
+        allergy_intolerance["clinicalStatus"] = {
+            "coding": [
+                {
+                    "system": clinical_status["system"],
+                    "code": clinical_status["code"],
+                    "display": clinical_status["display"]
+                }
+            ]
+        }
+    
+    # Add participant if practitioner provided (only in R5)
+    if practitioner_id and fhir_version != "R4":
         allergy_intolerance["participant"] = [
             {
                 "function": {
@@ -161,7 +181,10 @@ def generate_allergy_intolerance(patient_id: str, practitioner_id: Optional[str]
         allergy_intolerance["reaction"][0]["description"] = f"{severity_description} reaction with {onset_description.lower()}"
     
     # Generate text narrative
-    manifestation_texts = [m["concept"]["coding"][0]["display"] for m in manifestations]
+    if fhir_version == "R4":
+        manifestation_texts = [m["coding"][0]["display"] for m in manifestations]
+    else:
+        manifestation_texts = [m["concept"]["coding"][0]["display"] for m in manifestations]
     manifestation_list = ", ".join(manifestation_texts)
     
     allergy_intolerance["text"] = {
@@ -184,7 +207,7 @@ def generate_allergy_intolerance(patient_id: str, practitioner_id: Optional[str]
                 <h3>Manifestations</h3>
                 <table class="grid">
                     <tr><td>-</td><td><b>Concept</b></td></tr>
-                    {''.join([f'<tr><td>*</td><td>{m["concept"]["coding"][0]["display"]} <span style="background: LightGoldenRodYellow; margin: 4px; border: 1px solid khaki"> (<a href="https://browser.ihtsdotools.org/">SNOMED CT</a>#{m["concept"]["coding"][0]["code"]})</span></td></tr>' for m in manifestations])}
+                    {''.join([f'<tr><td>*</td><td>{(m["coding"][0] if fhir_version == "R4" else m["concept"]["coding"][0])["display"]} <span style="background: LightGoldenRodYellow; margin: 4px; border: 1px solid khaki"> (<a href="https://browser.ihtsdotools.org/">SNOMED CT</a>#{(m["coding"][0] if fhir_version == "R4" else m["concept"]["coding"][0])["code"]})</span></td></tr>' for m in manifestations])}
                 </table>
             </blockquote>
         </div>"""
