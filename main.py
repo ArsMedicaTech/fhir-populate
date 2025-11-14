@@ -865,18 +865,34 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
             coverage['subscriber']['reference'] = f"Patient/{server_patient_id}"
             coverage['beneficiary']['reference'] = f"Patient/{server_patient_id}"
 
-            # Update organization reference
-            original_org_id = coverage['policyHolder']['reference'].split('/')[1]
-            if original_org_id in organization_id_map:
-                server_org_id = organization_id_map[original_org_id]
-                coverage['policyHolder']['reference'] = f"Organization/{server_org_id}"
-                # R4 uses 'payor' (array), R5 uses 'insurer' (single reference)
-                if 'payor' in coverage:
-                    # R4: payor is an array
-                    if coverage['payor'] and coverage['payor'][0].get('reference'):
+            # Update organization reference from policyHolder
+            server_org_id = None
+            if 'policyHolder' in coverage and coverage['policyHolder']['reference'].startswith('Organization/'):
+                original_org_id = coverage['policyHolder']['reference'].split('/')[1]
+                if original_org_id in organization_id_map:
+                    server_org_id = organization_id_map[original_org_id]
+                    coverage['policyHolder']['reference'] = f"Organization/{server_org_id}"
+
+            # Update payor/insurer reference (R4 uses 'payor', R5 uses 'insurer')
+            # This might have a different organization ID, so check it separately
+            if 'payor' in coverage and coverage['payor']:
+                # R4: payor is an array
+                if coverage['payor'][0].get('reference', '').startswith('Organization/'):
+                    payor_org_id = coverage['payor'][0]['reference'].split('/')[1]
+                    if payor_org_id in organization_id_map:
+                        server_payor_id = organization_id_map[payor_org_id]
+                        coverage['payor'][0]['reference'] = f"Organization/{server_payor_id}"
+                    elif server_org_id:
+                        # Fallback: use the organization ID from policyHolder if payor org not in map
                         coverage['payor'][0]['reference'] = f"Organization/{server_org_id}"
-                elif 'insurer' in coverage:
-                    # R5: insurer is a single reference
+            elif 'insurer' in coverage and coverage['insurer'].get('reference', '').startswith('Organization/'):
+                # R5: insurer is a single reference
+                insurer_org_id = coverage['insurer']['reference'].split('/')[1]
+                if insurer_org_id in organization_id_map:
+                    server_insurer_id = organization_id_map[insurer_org_id]
+                    coverage['insurer']['reference'] = f"Organization/{server_insurer_id}"
+                elif server_org_id:
+                    # Fallback: use the organization ID from policyHolder if insurer org not in map
                     coverage['insurer']['reference'] = f"Organization/{server_org_id}"
 
             # Update policy holder reference if different from patient
