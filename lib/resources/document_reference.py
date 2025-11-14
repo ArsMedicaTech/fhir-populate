@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from faker import Faker
 from typing import Dict, Any, Optional
 
+from common import get_fhir_version
 from lib.data.document_references import (
     DOCUMENT_TYPES, DOCUMENT_CATEGORIES, DOCUMENT_REFERENCE_STATUSES,
     DOCUMENT_STATUSES, ATTESTATION_MODES, CLINICAL_NOTE_TEMPLATES
@@ -162,7 +163,12 @@ def generate_document_reference(patient_id: str, practitioner_id: str,
     document_type = random.choice(DOCUMENT_TYPES)
     category = random.choice(DOCUMENT_CATEGORIES)
     status = random.choice(DOCUMENT_REFERENCE_STATUSES)
-    doc_status = random.choice(DOCUMENT_STATUSES)
+    # Filter out invalid docStatus codes (deprecated is not valid in CompositionStatus)
+    valid_doc_statuses = [s for s in DOCUMENT_STATUSES if s != "deprecated"]
+    doc_status = random.choice(valid_doc_statuses if valid_doc_statuses else DOCUMENT_STATUSES)
+    
+    # Get FHIR version to determine field structure
+    fhir_version = get_fhir_version()
     
     # Use provided encounter date or generate a random one
     if encounter_date is None:
@@ -210,9 +216,6 @@ def generate_document_reference(patient_id: str, practitioner_id: str,
                 "display": practitioner_name
             }
         ],
-        "context": {
-            "reference": f"Encounter/{encounter_id}"
-        },
         "content": [
             {
                 "attachment": {
@@ -243,12 +246,32 @@ def generate_document_reference(patient_id: str, practitioner_id: str,
     # Add description
     document_reference["description"] = f"{document_type['text']} for encounter {encounter_id[:8]}"
     
-    # Add period if we have encounter date
-    if encounter_date:
-        document_reference["period"] = {
-            "start": encounter_date.isoformat(),
-            "end": (encounter_date + timedelta(minutes=random.randint(15, 120))).isoformat()
+    # Add context and period based on FHIR version
+    # In R4, context is 0..* (array) of Reference, and period is a direct field (not in context)
+    # In R5, context structure may differ
+    if fhir_version == "R4":
+        # R4: context is an array of references (0..*)
+        document_reference["context"] = [
+            {
+                "reference": f"Encounter/{encounter_id}"
+            }
+        ]
+        # R4: period is a direct field on DocumentReference, not within context
+        if encounter_date:
+            document_reference["period"] = {
+                "start": encounter_date.isoformat(),
+                "end": (encounter_date + timedelta(minutes=random.randint(15, 120))).isoformat()
+            }
+    else:  # FHIR R5
+        # R5: context can be a single reference or array, period is a direct field
+        document_reference["context"] = {
+            "reference": f"Encounter/{encounter_id}"
         }
+        if encounter_date:
+            document_reference["period"] = {
+                "start": encounter_date.isoformat(),
+                "end": (encounter_date + timedelta(minutes=random.randint(15, 120))).isoformat()
+            }
     
     # Add text narrative
     document_reference["text"] = {
