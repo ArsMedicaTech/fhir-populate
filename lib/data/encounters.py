@@ -167,7 +167,7 @@ ENCOUNTER_REASONS = [
     "Family planning consultation"
 ]
 
-# Participant types
+# Participant types (using codes from encounter-participant-type value set)
 PARTICIPANT_TYPES = [
     {
         "coding": [
@@ -209,8 +209,17 @@ PARTICIPANT_TYPES = [
         "coding": [
             {
                 "system": "http://terminology.hl7.org/CodeSystem/v3-ParticipationType",
-                "code": "RESP",
-                "display": "responsible party"
+                "code": "ADM",
+                "display": "admitter"
+            }
+        ]
+    },
+    {
+        "coding": [
+            {
+                "system": "http://terminology.hl7.org/CodeSystem/v3-ParticipationType",
+                "code": "DIS",
+                "display": "discharger"
             }
         ]
     }

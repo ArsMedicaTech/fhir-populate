@@ -900,11 +900,12 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
                 server_practitioner_id = practitioner_id_map[original_practitioner_id]
                 document_reference['author'][0]['reference'] = f"Practitioner/{server_practitioner_id}"
             
-            # Update encounter reference
-            original_encounter_id = document_reference['context'][0]['reference'].split('/')[1]
-            server_encounter_id = encounter_id_map.get(original_encounter_id)
-            if server_encounter_id:
-                document_reference['context'][0]['reference'] = f"Encounter/{server_encounter_id}"
+            # Update encounter reference (context is a single object in R4, not an array)
+            if 'context' in document_reference and document_reference['context'].get('reference'):
+                original_encounter_id = document_reference['context']['reference'].split('/')[1]
+                server_encounter_id = encounter_id_map.get(original_encounter_id)
+                if server_encounter_id:
+                    document_reference['context']['reference'] = f"Encounter/{server_encounter_id}"
             
             # Update binary reference
             original_binary_id = document_reference['content'][0]['attachment']['url'].split('/')[1]

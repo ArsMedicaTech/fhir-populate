@@ -210,11 +210,9 @@ def generate_document_reference(patient_id: str, practitioner_id: str,
                 "display": practitioner_name
             }
         ],
-        "context": [
-            {
-                "reference": f"Encounter/{encounter_id}"
-            }
-        ],
+        "context": {
+            "reference": f"Encounter/{encounter_id}"
+        },
         "content": [
             {
                 "attachment": {
