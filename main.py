@@ -679,11 +679,13 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
             server_patient_id = patient_id_map[original_patient_id]
             clinical_impression['subject']['reference'] = f"Patient/{server_patient_id}"
 
-            # Update practitioner reference
-            original_practitioner_id = clinical_impression['performer']['reference'].split('/')[1]
-            if original_practitioner_id in practitioner_id_map:
-                server_practitioner_id = practitioner_id_map[original_practitioner_id]
-                clinical_impression['performer']['reference'] = f"Practitioner/{server_practitioner_id}"
+            # Update practitioner reference (R4 uses 'assessor', R5 uses 'performer')
+            practitioner_ref_key = 'assessor' if 'assessor' in clinical_impression else 'performer'
+            if practitioner_ref_key in clinical_impression:
+                original_practitioner_id = clinical_impression[practitioner_ref_key]['reference'].split('/')[1]
+                if original_practitioner_id in practitioner_id_map:
+                    server_practitioner_id = practitioner_id_map[original_practitioner_id]
+                    clinical_impression[practitioner_ref_key]['reference'] = f"Practitioner/{server_practitioner_id}"
 
             # Update encounter reference if present
             if 'encounter' in clinical_impression:
@@ -694,7 +696,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
 
         # Create clinical impressions with updated references
         for clinical_impression in clinical_impressions:
-            response = fhir_request.create("ClinicalImpression", clinical_impression)
+            response = create_with_validation(fhir_request, "ClinicalImpression", clinical_impression)
             server_id = response.get('id')
             if not check_fhir_response(response, "ClinicalImpression", server_id):
                 raise Exception(f"Failed to create ClinicalImpression: {response.get('issue', [{}])[0].get('diagnostics', 'Unknown error')}")

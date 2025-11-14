@@ -3,10 +3,11 @@ ClinicalImpression resource generation function.
 """
 import uuid
 import random
-from datetime import timedelta
+from datetime import timedelta, timezone
 from faker import Faker
 from typing import Dict, Any
 
+from common import get_fhir_version
 from lib.data.clinical_impressions import (CLINICAL_IMPESSION_STATUSES, CLINICAL_IMPESSION_DESCRIPTIONS,
                                          CLINICAL_PROBLEMS, CLINICAL_FINDINGS, CLINICAL_SUMMARIES,
                                          INVESTIGATION_TYPES, INVESTIGATION_FINDINGS)
@@ -34,11 +35,21 @@ def generate_clinical_impression(patient_id: str, practitioner_id: str, encounte
     
     # Generate effective period (start and end times)
     start_time = fake.date_time_between(start_date='-7d', end_date='now')
+    # Ensure timezone is included in datetime strings (FHIR requirement)
+    if start_time.tzinfo is None:
+        start_time = start_time.replace(tzinfo=timezone.utc)
+    
     duration_minutes = random.randint(30, 180)  # 30 minutes to 3 hours
     end_time = start_time + timedelta(minutes=duration_minutes)
     
     # Generate date (when the impression was documented)
     date = end_time + timedelta(minutes=random.randint(5, 30))
+    # Ensure timezone is included in datetime strings (FHIR requirement)
+    if date.tzinfo is None:
+        date = date.replace(tzinfo=timezone.utc)
+    
+    # Get FHIR version to determine field structure
+    fhir_version = get_fhir_version()
     
     # Generate investigation findings
     num_findings = random.randint(2, 5)
@@ -67,17 +78,47 @@ def generate_clinical_impression(patient_id: str, practitioner_id: str, encounte
             "end": end_time.isoformat()
         },
         "date": date.isoformat(),
-        "performer": {
-            "reference": f"Practitioner/{practitioner_id}",
-            "display": f"Dr. {fake.last_name()}"
-        },
         "problem": [
             {
                 "display": problem
             }
         ],
-        "summary": summary,
-        "finding": [
+        "summary": summary
+    }
+    
+    # Add performer/assessor based on FHIR version
+    if fhir_version == "R4":
+        # FHIR R4 uses 'assessor' not 'performer'
+        clinical_impression["assessor"] = {
+            "reference": f"Practitioner/{practitioner_id}",
+            "display": f"Dr. {fake.last_name()}"
+        }
+    else:  # FHIR R5
+        # FHIR R5 uses 'performer'
+        clinical_impression["performer"] = {
+            "reference": f"Practitioner/{practitioner_id}",
+            "display": f"Dr. {fake.last_name()}"
+        }
+    
+    # Add finding field based on FHIR version
+    if fhir_version == "R4":
+        # FHIR R4: finding uses itemCodeableConcept directly
+        clinical_impression["finding"] = [
+            {
+                "itemCodeableConcept": {
+                    "coding": [
+                        {
+                            "system": clinical_finding["system"],
+                            "code": clinical_finding["code"],
+                            "display": clinical_finding["display"]
+                        }
+                    ]
+                }
+            }
+        ]
+    else:  # FHIR R5
+        # FHIR R5: finding uses item wrapper
+        clinical_impression["finding"] = [
             {
                 "item": {
                     "concept": {
@@ -92,7 +133,6 @@ def generate_clinical_impression(patient_id: str, practitioner_id: str, encounte
                 }
             }
         ]
-    }
     
     # Add encounter reference if provided
     if encounter_id:
@@ -138,7 +178,7 @@ def generate_clinical_impression(patient_id: str, practitioner_id: str, encounte
             <p><b>encounter</b>: <a href="encounter-{encounter_id if encounter_id else 'unknown'}.html">Encounter/{encounter_id if encounter_id else 'unknown'}</a></p>
             <p><b>effective</b>: {start_time.strftime('%Y-%m-%dT%H:%M:%S%z')} --&gt; {end_time.strftime('%Y-%m-%dT%H:%M:%S%z')}</p>
             <p><b>date</b>: {date.strftime('%Y-%m-%dT%H:%M:%S%z')}</p>
-            <p><b>performer</b>: <a href="practitioner-{practitioner_id}.html">Practitioner/{practitioner_id}</a></p>
+            <p><b>{'assessor' if fhir_version == 'R4' else 'performer'}</b>: <a href="practitioner-{practitioner_id}.html">Practitioner/{practitioner_id}</a></p>
             <p><b>problem</b>: <span>: {problem}</span></p>
             <p><b>summary</b>: <span title="Investigation: {investigation_type} - {', '.join(investigation_findings)}">{summary}</span></p>
             <blockquote>
