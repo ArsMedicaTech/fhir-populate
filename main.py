@@ -562,10 +562,11 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
             server_patient_id = patient_id_map[original_patient_id]
             encounter['subject']['reference'] = f"Patient/{server_patient_id}"
 
-            # Update practitioner reference
-            original_practitioner_id = encounter['participant'][0]['actor']['reference'].split('/')[1]
+            # Update practitioner reference (R4 uses 'individual', R5 uses 'actor')
+            participant_ref_key = 'individual' if 'individual' in encounter['participant'][0] else 'actor'
+            original_practitioner_id = encounter['participant'][0][participant_ref_key]['reference'].split('/')[1]
             server_practitioner_id = practitioner_id_map[original_practitioner_id]
-            encounter['participant'][0]['actor']['reference'] = f"Practitioner/{server_practitioner_id}"
+            encounter['participant'][0][participant_ref_key]['reference'] = f"Practitioner/{server_practitioner_id}"
 
             # Update location reference
             original_location_id = encounter['location'][0]['location']['reference'].split('/')[1]
