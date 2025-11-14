@@ -1,5 +1,6 @@
 """
 CarePlan resource generation function.
+Supports both FHIR R4 and R5 versions based on FHIR_VERSION environment variable.
 """
 import uuid
 import random
@@ -7,6 +8,7 @@ from datetime import timedelta
 from faker import Faker
 from typing import Dict, Any, Optional
 
+from common import get_fhir_version
 from lib.data.care_plans import (CARE_PLAN_STATUSES, CARE_PLAN_INTENTS, CARE_PLAN_CATEGORIES,
                                 CARE_PLAN_ACTIVITIES, CARE_PLAN_GOALS, CARE_PLAN_DESCRIPTIONS,
                                 CARE_PLAN_ADDRESSES, CARE_PLAN_BASED_ON, CARE_PLAN_REPLACES,
@@ -55,6 +57,9 @@ def generate_care_plan(patient_id: str, practitioner_id: str, encounter_id: Opti
     selected_goals = random.sample(CARE_PLAN_GOALS, num_goals)
     goals = [{"description": {"text": goal}} for goal in selected_goals]
     
+    # Get FHIR version to determine activity structure
+    fhir_version = get_fhir_version()
+    
     # Generate 2-5 activities
     num_activities = random.randint(2, 5)
     selected_activities = random.sample(CARE_PLAN_ACTIVITIES, num_activities)
@@ -65,10 +70,12 @@ def generate_care_plan(patient_id: str, practitioner_id: str, encounter_id: Opti
         activity_status = random.choice(CARE_PLAN_ACTIVITY_STATUS)
         activity_outcome = random.choice(CARE_PLAN_ACTIVITY_OUTCOME) if activity_status == "completed" else None
         
-        activity_entry = {
-            "performedActivity": [
-                {
-                    "concept": {
+        if fhir_version == "R4":
+            # FHIR R4 CarePlan.activity structure
+            activity_entry = {
+                "detail": {
+                    "kind": activity_detail["kind"],
+                    "code": {
                         "coding": [
                             {
                                 "system": activity["system"],
@@ -77,17 +84,41 @@ def generate_care_plan(patient_id: str, practitioner_id: str, encounter_id: Opti
                             }
                         ],
                         "text": activity["text"]
-                    }
+                    },
+                    "status": activity_status
                 }
-            ],
-            "plannedActivityReference": {
-                "reference": f"{activity_detail['kind']}/{str(uuid.uuid4())}"
-            },
-            "status": activity_status
-        }
-        
-        if activity_outcome:
-            activity_entry["outcome"] = activity_outcome
+            }
+            
+            # Add outcome if activity is completed
+            if activity_outcome:
+                activity_entry["outcomeCodeableConcept"] = {
+                    "text": activity_outcome
+                }
+        else:  # FHIR R5
+            # FHIR R5 CarePlan.activity structure
+            activity_entry = {
+                "performedActivity": [
+                    {
+                        "concept": {
+                            "coding": [
+                                {
+                                    "system": activity["system"],
+                                    "code": activity["code"],
+                                    "display": activity["display"]
+                                }
+                            ],
+                            "text": activity["text"]
+                        }
+                    }
+                ],
+                "plannedActivityReference": {
+                    "reference": f"{activity_detail['kind']}/{str(uuid.uuid4())}"
+                },
+                "status": activity_status
+            }
+            
+            if activity_outcome:
+                activity_entry["outcome"] = activity_outcome
         
         activities.append(activity_entry)
     
@@ -150,7 +181,6 @@ def generate_care_plan(patient_id: str, practitioner_id: str, encounter_id: Opti
         "status": status,
         "intent": intent,
         "category": [category],
-        "description": description,
         "subject": {
             "reference": f"Patient/{patient_id}",
             "display": f"Patient {patient_id[:8]}"
@@ -160,21 +190,25 @@ def generate_care_plan(patient_id: str, practitioner_id: str, encounter_id: Opti
             "end": end_date.isoformat()
         },
         "created": created_date.isoformat(),
-        "custodian": {
-            "reference": f"Practitioner/{practitioner_id}",
-            "display": f"Dr. {fake.last_name()}"
-        },
         "addresses": [
             {
-                "reference": {
-                    "reference": f"#{contained_condition_id}",
-                    "display": addresses.lower()
-                }
+                "reference": f"#{contained_condition_id}"
             }
         ],
         "goal": goals,
         "activity": activities
     }
+    
+    # Add version-specific fields
+    fhir_version = get_fhir_version()
+    if fhir_version == "R5":
+        # FHIR R5 supports description and custodian
+        care_plan["description"] = description
+        care_plan["custodian"] = {
+            "reference": f"Practitioner/{practitioner_id}",
+            "display": f"Dr. {fake.last_name()}"
+        }
+    # R4 doesn't have description or custodian at top level
     
     # Add encounter reference if provided
     if encounter_id:
@@ -197,7 +231,7 @@ def generate_care_plan(patient_id: str, practitioner_id: str, encounter_id: Opti
     care_plan["text"] = {
         "status": "additional",
         "div": f"""<div xmlns="http://www.w3.org/1999/xhtml">
-            <p>A comprehensive care plan to {description.lower()} for {addresses.lower()}.</p>
+            <p>A comprehensive care plan for {addresses.lower()}.</p>
             <p><b>Goals:</b> {goals_text}</p>
             <p><b>Activities:</b> {activities_text}</p>
             <p><b>Status:</b> {status}</p>
