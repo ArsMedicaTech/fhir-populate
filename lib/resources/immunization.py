@@ -202,11 +202,37 @@ def generate_immunization(patient_id: str, practitioner_id: str, encounter_id: s
         reaction = random.choice(VACCINE_REACTIONS)
         # In R4, reaction.detail is a Reference to an Observation, not CodeableConcept
         if fhir_version == "R4":
+            # Create a contained Observation resource for the reaction
+            contained_observation_id = f"reaction-{immunization_id[:8]}"
+            contained_observation = {
+                "resourceType": "Observation",
+                "id": contained_observation_id,
+                "status": "final",
+                "code": {
+                    "coding": [
+                        {
+                            "system": "http://snomed.info/sct",
+                            "code": "422587007",
+                            "display": "Adverse reaction"
+                        }
+                    ],
+                    "text": reaction
+                },
+                "subject": {
+                    "reference": f"Patient/{patient_id}"
+                }
+            }
+            
+            # Initialize contained array if it doesn't exist
+            if "contained" not in immunization:
+                immunization["contained"] = []
+            immunization["contained"].append(contained_observation)
+            
             immunization["reaction"] = [
                 {
                     "date": occurrence_date.isoformat(),
                     "detail": {
-                        "reference": f"Observation/{str(uuid.uuid4())}",
+                        "reference": f"#{contained_observation_id}",
                         "display": reaction
                     },
                     "reported": random.choice([True, False])
