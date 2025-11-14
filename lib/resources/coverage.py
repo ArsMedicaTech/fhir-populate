@@ -34,8 +34,8 @@ def generate_coverage(patient_id: str, organization_id: str,
     coverage_id = str(uuid.uuid4())
     status = random.choice(COVERAGE_STATUSES)
     kind = random.choice(COVERAGE_KINDS)
-    # Filter out invalid coverage type codes (HS is not valid in v3-ActCode)
-    valid_coverage_types = [t for t in COVERAGE_TYPES if t["code"] != "HS"]
+    # Filter out invalid coverage type codes (HS and VISION are not valid in v3-ActCode)
+    valid_coverage_types = [t for t in COVERAGE_TYPES if t["code"] not in ["HS", "VISION"]]
     coverage_type = random.choice(valid_coverage_types if valid_coverage_types else COVERAGE_TYPES)
     relationship = random.choice(COVERAGE_RELATIONSHIPS)
     insurance_company = random.choice(INSURANCE_COMPANIES)
