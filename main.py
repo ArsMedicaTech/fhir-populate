@@ -916,22 +916,24 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
                 server_practitioner_id = practitioner_id_map[original_practitioner_id]
                 document_reference['author'][0]['reference'] = f"Practitioner/{server_practitioner_id}"
             
-            # Update encounter reference (context is an array in R4)
+            # Update encounter reference
+            # R4: context is an object with encounter array inside
+            # R5: context is a single reference object
             if 'context' in document_reference:
-                if isinstance(document_reference['context'], list):
-                    # R4: context is an array
-                    if document_reference['context'] and document_reference['context'][0].get('reference'):
-                        original_encounter_id = document_reference['context'][0]['reference'].split('/')[1]
-                        server_encounter_id = encounter_id_map.get(original_encounter_id)
-                        if server_encounter_id:
-                            document_reference['context'][0]['reference'] = f"Encounter/{server_encounter_id}"
-                else:
-                    # R5: context is a single object
-                    if document_reference['context'].get('reference'):
-                        original_encounter_id = document_reference['context']['reference'].split('/')[1]
-                        server_encounter_id = encounter_id_map.get(original_encounter_id)
-                        if server_encounter_id:
-                            document_reference['context']['reference'] = f"Encounter/{server_encounter_id}"
+                if 'encounter' in document_reference['context']:
+                    # R4: context.encounter is an array
+                    if isinstance(document_reference['context']['encounter'], list) and document_reference['context']['encounter']:
+                        if document_reference['context']['encounter'][0].get('reference'):
+                            original_encounter_id = document_reference['context']['encounter'][0]['reference'].split('/')[1]
+                            server_encounter_id = encounter_id_map.get(original_encounter_id)
+                            if server_encounter_id:
+                                document_reference['context']['encounter'][0]['reference'] = f"Encounter/{server_encounter_id}"
+                elif document_reference['context'].get('reference'):
+                    # R5: context is a single reference object
+                    original_encounter_id = document_reference['context']['reference'].split('/')[1]
+                    server_encounter_id = encounter_id_map.get(original_encounter_id)
+                    if server_encounter_id:
+                        document_reference['context']['reference'] = f"Encounter/{server_encounter_id}"
             
             # Update binary reference
             original_binary_id = document_reference['content'][0]['attachment']['url'].split('/')[1]
