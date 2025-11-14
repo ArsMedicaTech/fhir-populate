@@ -228,37 +228,24 @@ def generate_document_reference(patient_id: str, practitioner_id: str,
         ]
     }
     
-    # Add attestation (70% chance)
-    if random.random() < 0.7:
-        attestation_mode = random.choice(ATTESTATION_MODES)
-        attestation_time = document_date + timedelta(minutes=random.randint(5, 60))
-        document_reference["attester"] = [
-            {
-                "mode": attestation_mode,
-                "time": attestation_time.isoformat(),
-                "party": {
-                    "reference": f"Practitioner/{practitioner_id}",
-                    "display": practitioner_name
-                }
-            }
-        ]
-    
     # Add description
     document_reference["description"] = f"{document_type['text']} for encounter {encounter_id[:8]}"
     
     # Add context and period based on FHIR version
-    # In R4, context is 0..* (array) of Reference, and period is a direct field (not in context)
+    # In R4, context is a single object (0..1) with encounter array inside, and period is inside context
     # In R5, context structure may differ
     if fhir_version == "R4":
-        # R4: context is an array of references (0..*)
-        document_reference["context"] = [
-            {
-                "reference": f"Encounter/{encounter_id}"
-            }
-        ]
-        # R4: period is a direct field on DocumentReference, not within context
+        # R4: context is a single object with encounter array inside, period is inside context
+        document_reference["context"] = {
+            "encounter": [
+                {
+                    "reference": f"Encounter/{encounter_id}"
+                }
+            ]
+        }
+        # R4: period is inside context, not at the top level
         if encounter_date:
-            document_reference["period"] = {
+            document_reference["context"]["period"] = {
                 "start": encounter_date.isoformat(),
                 "end": (encounter_date + timedelta(minutes=random.randint(15, 120))).isoformat()
             }
@@ -272,6 +259,20 @@ def generate_document_reference(patient_id: str, practitioner_id: str,
                 "start": encounter_date.isoformat(),
                 "end": (encounter_date + timedelta(minutes=random.randint(15, 120))).isoformat()
             }
+        # R5: attester is available
+        if random.random() < 0.7:
+            attestation_mode = random.choice(ATTESTATION_MODES)
+            attestation_time = document_date + timedelta(minutes=random.randint(5, 60))
+            document_reference["attester"] = [
+                {
+                    "mode": attestation_mode,
+                    "time": attestation_time.isoformat(),
+                    "party": {
+                        "reference": f"Practitioner/{practitioner_id}",
+                        "display": practitioner_name
+                    }
+                }
+            ]
     
     # Add text narrative
     document_reference["text"] = {
