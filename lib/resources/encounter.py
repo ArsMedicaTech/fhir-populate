@@ -87,11 +87,8 @@ def generate_encounter(patient_id: str, practitioner_id: str, location_id: str, 
         "text": encounter_type.get("display", "")
     }
     
-    # Convert priority - same as class, it's a Coding in R4
-    if fhir_version == "R4":
-        priority_coding = priority["coding"][0] if "coding" in priority else priority
-    else:
-        priority_coding = priority["coding"][0] if "coding" in priority else priority
+    # Priority is a CodeableConcept (not Coding) - keep it as is
+    # No conversion needed, priority already has the correct CodeableConcept structure
     
     # Create the encounter resource
     encounter_resource = {
@@ -106,7 +103,7 @@ def generate_encounter(patient_id: str, practitioner_id: str, location_id: str, 
         "status": status,
         "class": encounter_class_coding,
         "type": [encounter_type_codeable],
-        "priority": priority_coding,
+        "priority": priority,
         "subject": {
             "reference": f"Patient/{patient_id}"
         },
@@ -179,7 +176,7 @@ def generate_encounter(patient_id: str, practitioner_id: str, location_id: str, 
 
     # Add text narrative for generated encounters
     class_display = encounter_class_coding.get('display', '') if isinstance(encounter_class_coding, dict) else ''
-    priority_display = priority_coding.get('display', '') if isinstance(priority_coding, dict) else ''
+    priority_display = priority.get('coding', [{}])[0].get('display', '') if isinstance(priority, dict) and 'coding' in priority else ''
     encounter_resource["text"] = {
         "status": "generated",
         "div": f"<div xmlns=\"http://www.w3.org/1999/xhtml\"><p><b>Generated Narrative: Encounter</b><a name=\"{encounter_id}\"> </a></p><div style=\"display: inline-block; background-color: #d9e0e7; padding: 6px; margin: 4px; border: 1px solid #8da1b4; border-radius: 5px; line-height: 60%\"><p style=\"margin-bottom: 0px\">Resource Encounter &quot;{encounter_id}&quot; </p></div><p><b>identifier</b>: id: {identifier_value} (use: TEMP)</p><p><b>status</b>: {status}</p><p><b>class</b>: {class_display}</p><p><b>priority</b>: {priority_display}</p><p><b>type</b>: {encounter_type.get('display', '')}</p><p><b>subject</b>: <a href=\"patient-{patient_id}.html\">Patient/{patient_id}</a></p><p><b>serviceProvider</b>: <a href=\"organization-{organization_id}.html\">Organization/{organization_id}</a></p><p><b>reason</b>: {reason}</p></div>"
