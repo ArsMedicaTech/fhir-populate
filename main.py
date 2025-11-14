@@ -766,14 +766,19 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
             server_patient_id = patient_id_map[original_patient_id]
             medication_administration['subject']['reference'] = f"Patient/{server_patient_id}"
 
-            # Update practitioner reference
-            original_practitioner_id = medication_administration['performer'][0]['actor']['reference']['reference'].split('/')[1]
+            # Update practitioner reference (actor.reference is now a string, not nested)
+            original_practitioner_id = medication_administration['performer'][0]['actor']['reference'].split('/')[1]
             if original_practitioner_id in practitioner_id_map:
                 server_practitioner_id = practitioner_id_map[original_practitioner_id]
-                medication_administration['performer'][0]['actor']['reference']['reference'] = f"Practitioner/{server_practitioner_id}"
+                medication_administration['performer'][0]['actor']['reference'] = f"Practitioner/{server_practitioner_id}"
 
-            # Update encounter reference if present
-            if 'encounter' in medication_administration:
+            # Update encounter/context reference if present (R4 uses 'context', R5 uses 'encounter')
+            if 'context' in medication_administration:
+                original_encounter_id = medication_administration['context']['reference'].split('/')[1]
+                server_encounter_id = encounter_id_map.get(original_encounter_id)
+                if server_encounter_id:
+                    medication_administration['context']['reference'] = f"Encounter/{server_encounter_id}"
+            elif 'encounter' in medication_administration:
                 original_encounter_id = medication_administration['encounter']['reference'].split('/')[1]
                 server_encounter_id = encounter_id_map.get(original_encounter_id)
                 if server_encounter_id:
