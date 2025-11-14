@@ -1,5 +1,6 @@
 """
 Generates FHIR Encounter resources with randomized attributes for testing purposes.
+Supports both FHIR R4 and R5 versions based on FHIR_VERSION environment variable.
 """
 import uuid
 import random
@@ -8,6 +9,7 @@ from faker import Faker
 
 from typing import Dict, Any
 
+from common import get_fhir_version
 from lib.data.encounters import (ENCOUNTER_CLASSES, ENCOUNTER_STATUSES,
                                 ENCOUNTER_PRIORITIES, ENCOUNTER_REASONS, PARTICIPANT_TYPES)
 from lib.data.encounter_reasons import ENCOUNTER_REASON_CODES
@@ -52,7 +54,24 @@ def generate_encounter(patient_id: str, practitioner_id: str, location_id: str, 
 
     # Generate identifier
     identifier_value = f"Encounter_{fake.last_name()}_{start_time.strftime('%Y%m%d')}"
+    
+    # Get FHIR version to determine field structure
+    fhir_version = get_fhir_version()
 
+    # Convert encounter_type to proper CodeableConcept structure
+    # encounter_type comes from ENCOUNTER_REASON_CODES which has code/display/system
+    # but type field needs CodeableConcept with coding array
+    encounter_type_codeable = {
+        "coding": [
+            {
+                "system": encounter_type.get("system", "http://snomed.info/sct"),
+                "code": encounter_type.get("code", ""),
+                "display": encounter_type.get("display", "")
+            }
+        ],
+        "text": encounter_type.get("display", "")
+    }
+    
     # Create the encounter resource
     encounter_resource = {
         "resourceType": "Encounter",
@@ -65,7 +84,7 @@ def generate_encounter(patient_id: str, practitioner_id: str, location_id: str, 
         ],
         "status": status,
         "class": encounter_class,
-        "type": [encounter_type],
+        "type": [encounter_type_codeable],
         "priority": priority,
         "subject": {
             "reference": f"Patient/{patient_id}"
@@ -88,19 +107,44 @@ def generate_encounter(patient_id: str, practitioner_id: str, location_id: str, 
                 }
             }
         ],
-        "reason": [
+        "period": period
+    }
+    
+    # Add reason field based on FHIR version
+    if fhir_version == "R4":
+        # FHIR R4 uses reasonCode with CodeableConcept
+        encounter_resource["reasonCode"] = [
+            {
+                "coding": [
+                    {
+                        "system": encounter_type.get("system", "http://snomed.info/sct"),
+                        "code": encounter_type.get("code", ""),
+                        "display": encounter_type.get("display", reason)
+                    }
+                ],
+                "text": reason
+            }
+        ]
+    else:  # FHIR R5
+        # FHIR R5 uses reason with CodeableReference
+        encounter_resource["reason"] = [
             {
                 "value": [
                     {
                         "concept": {
+                            "coding": [
+                                {
+                                    "system": encounter_type.get("system", "http://snomed.info/sct"),
+                                    "code": encounter_type.get("code", ""),
+                                    "display": encounter_type.get("display", reason)
+                                }
+                            ],
                             "text": reason
                         }
                     }
                 ]
             }
-        ],
-        "period": period
-    }
+        ]
 
     # Add text narrative for generated encounters
     encounter_resource["text"] = {
