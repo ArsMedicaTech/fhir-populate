@@ -3,6 +3,7 @@ Some helper scripts for generating FHIR data for testing environments.
 """
 import time
 import random
+from datetime import datetime
 from faker import Faker
 
 import json
@@ -31,6 +32,8 @@ from lib.resources.medication_administration import generate_medication_administ
 from lib.resources.allergy_intolerance import generate_allergy_intolerance
 from lib.resources.care_plan import generate_care_plan
 from lib.resources.coverage import generate_coverage
+from lib.resources.document_reference import generate_document_reference, generate_binary_resource
+from lib.data.document_references import DOCUMENT_TYPES
 
 
 dotenv.load_dotenv()
@@ -102,6 +105,8 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
     allergy_intolerances = []
     care_plans = []
     coverages = []
+    document_references = []
+    binaries = []
 
     for _ in range(25):
         patient = generate_patient()
@@ -151,6 +156,40 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
             encounter = generate_encounter(patient['id'], practitioner['id'], location['id'], organization['id'])
             encounters.append(encounter)
             patient_encounters.append(encounter)
+            
+            # Generate clinical notes (DocumentReference) for most encounters (80% chance)
+            if random.random() < 0.8:
+                # Extract encounter date from period
+                encounter_date_str = encounter.get('period', {}).get('start')
+                if encounter_date_str:
+                    try:
+                        encounter_date = datetime.fromisoformat(encounter_date_str.replace('Z', '+00:00'))
+                    except:
+                        encounter_date = datetime.now()
+                else:
+                    encounter_date = datetime.now()
+                
+                # Select a document type for this note
+                document_type = random.choice(DOCUMENT_TYPES)
+                
+                # Generate Binary resource for the note content
+                binary = generate_binary_resource(
+                    patient['id'],
+                    practitioner['id'],
+                    document_type,
+                    encounter_date
+                )
+                binaries.append(binary)
+                
+                # Generate DocumentReference linked to the encounter
+                document_reference = generate_document_reference(
+                    patient['id'],
+                    practitioner['id'],
+                    encounter['id'],
+                    binary['id'],
+                    encounter_date
+                )
+                document_references.append(document_reference)
 
         # Generate 1 to 2 diagnostic reports for each patient
         for _ in range(random.randint(1, 2)):
@@ -301,7 +340,9 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
         "medication_administrations": medication_administrations,
         "allergy_intolerances": allergy_intolerances,
         "care_plans": care_plans,
-        "coverages": coverages
+        "coverages": coverages,
+        "document_references": document_references,
+        "binaries": binaries
     }
 
     # Write the output to a JSON file
@@ -328,6 +369,8 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
     print(f" - Allergy Intolerances: {len(allergy_intolerances)}")
     print(f" - Care Plans: {len(care_plans)}")
     print(f" - Coverages: {len(coverages)}")
+    print(f" - Document References: {len(document_references)}")
+    print(f" - Binaries: {len(binaries)}")
 
     if fhir_server:
         fhir_request = Request(host=fhir_server.host, port=fhir_server.port, path=fhir_server.path)
@@ -902,6 +945,59 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
                 print(err)
                 raise Exception(err)
             print(f"Created Coverage with ID: {response.get('id')}")
+        
+        # Create Binary resources first and store their server-assigned IDs
+        binary_id_map = {}
+        for binary in binaries:
+            response = fhir_request.create("Binary", binary)
+            if response.get('issue') and response['issue'][0]['severity'] == 'error':
+                err = response['issue'][0]['diagnostics']
+                print(err)
+                raise Exception(err)
+            server_id = response.get('id')
+            binary_id_map[binary['id']] = server_id
+            print(f"Created Binary with ID: {server_id}")
+        
+        # Update document reference references to use server-assigned IDs
+        for document_reference in document_references:
+            # Update patient reference
+            original_patient_id = document_reference['subject']['reference'].split('/')[1]
+            server_patient_id = patient_id_map[original_patient_id]
+            document_reference['subject']['reference'] = f"Patient/{server_patient_id}"
+            
+            # Update practitioner reference
+            original_practitioner_id = document_reference['author'][0]['reference'].split('/')[1]
+            if original_practitioner_id in practitioner_id_map:
+                server_practitioner_id = practitioner_id_map[original_practitioner_id]
+                document_reference['author'][0]['reference'] = f"Practitioner/{server_practitioner_id}"
+            
+            # Update encounter reference
+            original_encounter_id = document_reference['context'][0]['reference'].split('/')[1]
+            server_encounter_id = encounter_id_map.get(original_encounter_id)
+            if server_encounter_id:
+                document_reference['context'][0]['reference'] = f"Encounter/{server_encounter_id}"
+            
+            # Update binary reference
+            original_binary_id = document_reference['content'][0]['attachment']['url'].split('/')[1]
+            server_binary_id = binary_id_map.get(original_binary_id)
+            if server_binary_id:
+                document_reference['content'][0]['attachment']['url'] = f"Binary/{server_binary_id}"
+            
+            # Update attester reference if present
+            if 'attester' in document_reference:
+                original_attester_id = document_reference['attester'][0]['party']['reference'].split('/')[1]
+                if original_attester_id in practitioner_id_map:
+                    server_attester_id = practitioner_id_map[original_attester_id]
+                    document_reference['attester'][0]['party']['reference'] = f"Practitioner/{server_attester_id}"
+        
+        # Create document references with updated references
+        for document_reference in document_references:
+            response = fhir_request.create("DocumentReference", document_reference)
+            if response.get('issue') and response['issue'][0]['severity'] == 'error':
+                err = response['issue'][0]['diagnostics']
+                print(err)
+                raise Exception(err)
+            print(f"Created DocumentReference with ID: {response.get('id')}")
         
         # Final verification: Check a few appointments to ensure participants are stored
         print("\n" + "="*60)
