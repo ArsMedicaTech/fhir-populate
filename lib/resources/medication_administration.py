@@ -3,10 +3,12 @@ MedicationAdministration resource generation function.
 """
 import uuid
 import random
-from datetime import timedelta
+import base64
+from datetime import timedelta, timezone
 from faker import Faker
 from typing import Dict, Any, Optional
 
+from common import get_fhir_version
 from lib.data.medication_administrations import (MEDICATION_ADMINISTRATION_STATUSES, MEDICATIONS,
                                                ADMINISTRATION_ROUTES, ADMINISTRATION_METHODS,
                                                ADMINISTRATION_REASONS, DOSAGE_TEXTS, DOSE_QUANTITIES,
@@ -34,27 +36,40 @@ def generate_medication_administration(patient_id: str, practitioner_id: str,
     medication = random.choice(MEDICATIONS)
     route = random.choice(ADMINISTRATION_ROUTES)
     method = random.choice(ADMINISTRATION_METHODS)
-    reason = random.choice(ADMINISTRATION_REASONS)
+    # Filter out invalid reason codes (only a, b, c are valid in reason-medication-given)
+    valid_reasons = [r for r in ADMINISTRATION_REASONS if r["code"] in ["a", "b", "c"]]
+    reason = random.choice(valid_reasons if valid_reasons else ADMINISTRATION_REASONS)
     dosage_text = random.choice(DOSAGE_TEXTS)
     dose_quantity = random.choice(DOSE_QUANTITIES)
     note = random.choice(ADMINISTRATION_NOTES)
-    performer_role = random.choice(PERFORMER_ROLES)
+    # Filter out invalid performer roles (VER is not valid in R4)
+    valid_performer_roles = [r for r in PERFORMER_ROLES if r["code"] != "VER"]
+    performer_role = random.choice(valid_performer_roles if valid_performer_roles else PERFORMER_ROLES)
     signature_type = random.choice(SIGNATURE_TYPES)
+    
+    # Get FHIR version to determine field structure
+    fhir_version = get_fhir_version()
     
     # Generate occurrence times
     start_time = fake.date_time_between(start_date='-30d', end_date='now')
+    # Ensure timezone is included in datetime strings (FHIR requirement)
+    if start_time.tzinfo is None:
+        start_time = start_time.replace(tzinfo=timezone.utc)
+    
     # For ongoing medications, don't set end time
-    occurrence_period = {
+    effective_period = {
         "start": start_time.isoformat()
     }
     
     # 30% chance of being completed (with end time)
     if random.random() < 0.3 and status in ["completed", "stopped"]:
         end_time = start_time + timedelta(hours=random.randint(1, 72))
-        occurrence_period["end"] = end_time.isoformat()
+        if end_time.tzinfo is None:
+            end_time = end_time.replace(tzinfo=timezone.utc)
+        effective_period["end"] = end_time.isoformat()
     
-    # Generate contained medication resource
-    contained_medication_id = f"med{random.randint(1000, 9999)}"
+    # Generate contained medication resource with unique ID
+    contained_medication_id = f"med{medication_admin_id[:8]}"
     contained_medication = {
         "resourceType": "Medication",
         "id": contained_medication_id,
@@ -72,14 +87,27 @@ def generate_medication_administration(patient_id: str, practitioner_id: str,
     # Generate provenance for event history
     provenance_id = "signature"
     recorded_time = fake.date_time_between(start_date='-7d', end_date='now')
-    signature_data = fake.text(max_nb_chars=20).encode('utf-8').hex()
+    # Ensure timezone is included (instants require timezone)
+    if recorded_time.tzinfo is None:
+        recorded_time = recorded_time.replace(tzinfo=timezone.utc)
+    # Generate base64-encoded signature data (FHIR requires base64, not hex)
+    signature_text = fake.text(max_nb_chars=20)
+    signature_data = base64.b64encode(signature_text.encode('utf-8')).decode('utf-8')
+    
+    # Reference the MedicationRequest if available, otherwise reference the contained Medication
+    provenance_target = None
+    if medication_request_id:
+        provenance_target = f"MedicationRequest/{medication_request_id}"
+    else:
+        # Reference the contained medication as a fallback
+        provenance_target = f"#{contained_medication_id}"
     
     contained_provenance = {
         "resourceType": "Provenance",
         "id": provenance_id,
         "target": [
             {
-                "reference": f"ServiceRequest/{str(uuid.uuid4())}"
+                "reference": provenance_target
             }
         ],
         "recorded": recorded_time.isoformat(),
@@ -129,36 +157,15 @@ def generate_medication_administration(patient_id: str, practitioner_id: str,
         "id": medication_admin_id,
         "contained": [contained_medication, contained_provenance],
         "status": status,
-        "medication": {
-            "reference": {
-                "reference": f"#{contained_medication_id}"
-            }
-        },
         "subject": {
             "reference": f"Patient/{patient_id}",
             "display": f"Patient {patient_id[:8]}"
         },
-        "occurencePeriod": occurrence_period,
         "performer": [
             {
                 "actor": {
-                    "reference": {
-                        "reference": f"Practitioner/{practitioner_id}",
-                        "display": f"Dr. {fake.last_name()}"
-                    }
-                }
-            }
-        ],
-        "reason": [
-            {
-                "concept": {
-                    "coding": [
-                        {
-                            "system": reason["system"],
-                            "code": reason["code"],
-                            "display": reason["display"]
-                        }
-                    ]
+                    "reference": f"Practitioner/{practitioner_id}",
+                    "display": f"Dr. {fake.last_name()}"
                 }
             }
         ],
@@ -178,9 +185,7 @@ def generate_medication_administration(patient_id: str, practitioner_id: str,
             },
             "dose": {
                 "value": dose_quantity["value"],
-                "unit": dose_quantity["unit"],
-                "system": "http://unitsofmeasure.org",
-                "code": dose_quantity["code"]
+                "unit": dose_quantity["unit"]
             }
         },
         "eventHistory": [
@@ -191,17 +196,73 @@ def generate_medication_administration(patient_id: str, practitioner_id: str,
         ]
     }
     
+    # Only add system and code for valid UCUM units (mg, ml, etc.)
+    # Non-UCUM units like "tablet", "capsule", "drops" should not have system/code
+    valid_ucum_units = ["mg", "ml", "g", "kg", "l", "mcg", "units"]
+    if dose_quantity["code"] in valid_ucum_units:
+        medication_administration["dosage"]["dose"]["system"] = "http://unitsofmeasure.org"
+        medication_administration["dosage"]["dose"]["code"] = dose_quantity["code"]
+    
+    # Add medication field based on FHIR version
+    if fhir_version == "R4":
+        # FHIR R4: medicationReference
+        medication_administration["medicationReference"] = {
+            "reference": f"#{contained_medication_id}"
+        }
+        # FHIR R4: effective[x] (required) - use effectivePeriod
+        medication_administration["effectivePeriod"] = effective_period
+        # FHIR R4: reasonCode (not reason)
+        medication_administration["reasonCode"] = [
+            {
+                "coding": [
+                    {
+                        "system": reason["system"],
+                        "code": reason["code"],
+                        "display": reason["display"]
+                    }
+                ]
+            }
+        ]
+        # FHIR R4: context (not encounter)
+        if encounter_id:
+            medication_administration["context"] = {
+                "reference": f"Encounter/{encounter_id}",
+                "display": f"Encounter {encounter_id[:8]}"
+            }
+    else:  # FHIR R5
+        # FHIR R5: medication with reference wrapper
+        medication_administration["medication"] = {
+            "reference": {
+                "reference": f"#{contained_medication_id}"
+            }
+        }
+        # FHIR R5: effective[x] (required) - use effectivePeriod
+        medication_administration["effectivePeriod"] = effective_period
+        # FHIR R5: reason with concept wrapper
+        medication_administration["reason"] = [
+            {
+                "concept": {
+                    "coding": [
+                        {
+                            "system": reason["system"],
+                            "code": reason["code"],
+                            "display": reason["display"]
+                        }
+                    ]
+                }
+            }
+        ]
+        # FHIR R5: encounter
+        if encounter_id:
+            medication_administration["encounter"] = {
+                "reference": f"Encounter/{encounter_id}",
+                "display": f"Encounter {encounter_id[:8]}"
+            }
+    
     # Add medication request reference if provided
     if medication_request_id:
         medication_administration["request"] = {
             "reference": f"MedicationRequest/{medication_request_id}"
-        }
-    
-    # Add encounter reference if provided
-    if encounter_id:
-        medication_administration["encounter"] = {
-            "reference": f"Encounter/{encounter_id}",
-            "display": f"Encounter {encounter_id[:8]}"
         }
     
     # Add note if present
@@ -224,11 +285,11 @@ def generate_medication_administration(patient_id: str, practitioner_id: str,
             <h3>Medications</h3>
             <table class="grid">
                 <tr><td>-</td><td><b>Reference</b></td></tr>
-                <tr><td>*</td><td><a name="{contained_medication_id}"> </a><blockquote><p/><p><a name="{contained_medication_id}"> </a></p><p><b>code</b>: {medication['display']} <span style="background: LightGoldenRodYellow; margin: 4px; border: 1px solid khaki"> (<a href="http://terminology.hl7.org/5.1.0/CodeSystem-v3-ndc.html">National drug codes</a>#{medication['code']})</span></p></blockquote></td></tr>
+                <tr><td>*</td><td><a name="{contained_medication_id}"> </a><blockquote><p><b>code</b>: {medication['display']} <span style="background: LightGoldenRodYellow; margin: 4px; border: 1px solid khaki"> (<a href="http://terminology.hl7.org/5.1.0/CodeSystem-v3-ndc.html">National drug codes</a>#{medication['code']})</span></p></blockquote></td></tr>
             </table>
             <p><b>subject</b>: <a href="patient-{patient_id}.html">Patient/{patient_id}</a> &quot;Patient {patient_id[:8]}&quot;</p>
-            {f'<p><b>encounter</b>: <a href="encounter-{encounter_id}.html">Encounter/{encounter_id}</a></p>' if encounter_id else ''}
-            <p><b>occurence</b>: {start_time.strftime('%Y-%m-%dT%H:%M:%S+01:00')} {'--&gt; (ongoing)' if 'end' not in occurrence_period else f'--&gt; {occurrence_period["end"]}'}</p>
+            {f'<p><b>{"context" if fhir_version == "R4" else "encounter"}</b>: <a href="encounter-{encounter_id}.html">Encounter/{encounter_id}</a></p>' if encounter_id else ''}
+            <p><b>effective</b>: {start_time.strftime('%Y-%m-%dT%H:%M:%S%z')} {'--&gt; (ongoing)' if 'end' not in effective_period else f'--&gt; {effective_period["end"]}'}</p>
             <blockquote>
                 <p><b>performer</b></p>
                 <h3>Actors</h3>
@@ -250,8 +311,7 @@ def generate_medication_administration(patient_id: str, practitioner_id: str,
             </table>
             <p><b>eventHistory</b>: <a name="signature"> </a></p>
             <blockquote>
-                <p/><p><a name="signature"> </a></p>
-                <p><b>target</b>: <a href="servicerequest-example2.html">ServiceRequest/physiotherapy</a></p>
+                <p><b>target</b>: <a href="medicationadministration-{medication_admin_id}.html">MedicationAdministration/{medication_admin_id}</a></p>
                 <p><b>recorded</b>: {recorded_time.strftime('%d %b %Y, %I:%M:%S %p')}</p>
                 <h3>Agents</h3>
                 <table class="grid">
