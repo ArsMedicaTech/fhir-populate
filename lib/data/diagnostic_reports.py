@@ -85,8 +85,26 @@ DIAGNOSTIC_REPORT_CATEGORIES = [
         "coding": [
             {
                 "system": "http://terminology.hl7.org/CodeSystem/v2-0074",
-                "code": "PATH",
+                "code": "PAT",
                 "display": "Pathology"
+            }
+        ]
+    },
+    {
+        "coding": [
+            {
+                "system": "http://terminology.hl7.org/CodeSystem/v2-0074",
+                "code": "SP",
+                "display": "Surgical Pathology"
+            }
+        ]
+    },
+    {
+        "coding": [
+            {
+                "system": "http://terminology.hl7.org/CodeSystem/v2-0074",
+                "code": "CH",
+                "display": "Chemistry"
             }
         ]
     }
