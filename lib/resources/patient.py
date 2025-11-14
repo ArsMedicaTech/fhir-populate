@@ -23,7 +23,15 @@ def generate_patient() -> Dict[str, Any]:
     last_name = fake.last_name()
     gender = random.choice(["male", "female", "other", "unknown"])
 
-    return {
+    birth_date = fake.date_of_birth(minimum_age=18, maximum_age=90)
+    phone_number = fake.phone_number()
+    email = fake.email()
+    address_line = fake.street_address()
+    city = fake.city()
+    state = fake.state_abbr()
+    postal_code = fake.zipcode()
+    
+    patient = {
         "resourceType": "Patient",
         "id": patient_id,
         "name": [{
@@ -32,17 +40,35 @@ def generate_patient() -> Dict[str, Any]:
             "given": [first_name]
         }],
         "telecom": [
-            {"system": "phone", "value": fake.phone_number(), "use": "mobile"},
-            {"system": "email", "value": fake.email()}
+            {"system": "phone", "value": phone_number, "use": "mobile"},
+            {"system": "email", "value": email}
         ],
         "gender": gender,
-        "birthDate": fake.date_of_birth(minimum_age=18, maximum_age=90).isoformat(),
+        "birthDate": birth_date.isoformat(),
         "address": [{
             "use": "home",
-            "line": [fake.street_address()],
-            "city": fake.city(),
-            "state": fake.state_abbr(),
-            "postalCode": fake.zipcode(),
+            "line": [address_line],
+            "city": city,
+            "state": state,
+            "postalCode": postal_code,
             "country": "US"
         }]
     }
+    
+    # Add text narrative (best practice)
+    patient["text"] = {
+        "status": "generated",
+        "div": f"""<div xmlns="http://www.w3.org/1999/xhtml">
+            <p><b>Generated Narrative: Patient</b><a name="{patient_id}"> </a></p>
+            <div style="display: inline-block; background-color: #d9e0e7; padding: 6px; margin: 4px; border: 1px solid #8da1b4; border-radius: 5px; line-height: 60%">
+                <p style="margin-bottom: 0px">Resource Patient &quot;{patient_id}&quot; </p>
+            </div>
+            <p><b>name</b>: {first_name} {last_name}</p>
+            <p><b>gender</b>: {gender}</p>
+            <p><b>birthDate</b>: {birth_date.strftime('%Y-%m-%d')}</p>
+            <p><b>telecom</b>: {phone_number} (mobile), {email} (email)</p>
+            <p><b>address</b>: {address_line}, {city}, {state} {postal_code}</p>
+        </div>"""
+    }
+    
+    return patient
