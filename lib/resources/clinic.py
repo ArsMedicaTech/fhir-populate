@@ -30,6 +30,8 @@ def generate_clinic_and_location() -> Tuple[Dict[str, Any], Dict[str, Any]]:
         "country": "US"
     }
 
+    phone_number = fake.phone_number()
+    
     clinic = {
         "resourceType": "Organization",
         "id": clinic_id,
@@ -41,8 +43,23 @@ def generate_clinic_and_location() -> Tuple[Dict[str, Any], Dict[str, Any]]:
                 "display": "Healthcare Provider"
             }]
         }],
-        "telecom": [{"system": "phone", "value": fake.phone_number()}],
+        "telecom": [{"system": "phone", "value": phone_number}],
         "address": [address]
+    }
+    
+    # Add text narrative (best practice)
+    clinic["text"] = {
+        "status": "generated",
+        "div": f"""<div xmlns="http://www.w3.org/1999/xhtml">
+            <p><b>Generated Narrative: Organization</b><a name="{clinic_id}"> </a></p>
+            <div style="display: inline-block; background-color: #d9e0e7; padding: 6px; margin: 4px; border: 1px solid #8da1b4; border-radius: 5px; line-height: 60%">
+                <p style="margin-bottom: 0px">Resource Organization &quot;{clinic_id}&quot; </p>
+            </div>
+            <p><b>name</b>: {clinic_name}</p>
+            <p><b>type</b>: Healthcare Provider</p>
+            <p><b>telecom</b>: {phone_number} (phone)</p>
+            <p><b>address</b>: {address['line'][0]}, {address['city']}, {address['state']} {address['postalCode']}</p>
+        </div>"""
     }
 
     location = {
@@ -61,4 +78,20 @@ def generate_clinic_and_location() -> Tuple[Dict[str, Any], Dict[str, Any]]:
             "reference": f"Organization/{clinic_id}"
         }
     }
+    
+    # Add text narrative (best practice)
+    location["text"] = {
+        "status": "generated",
+        "div": f"""<div xmlns="http://www.w3.org/1999/xhtml">
+            <p><b>Generated Narrative: Location</b><a name="{location_id}"> </a></p>
+            <div style="display: inline-block; background-color: #d9e0e7; padding: 6px; margin: 4px; border: 1px solid #8da1b4; border-radius: 5px; line-height: 60%">
+                <p style="margin-bottom: 0px">Resource Location &quot;{location_id}&quot; </p>
+            </div>
+            <p><b>name</b>: {clinic_name}</p>
+            <p><b>address</b>: {address['line'][0]}, {address['city']}, {address['state']} {address['postalCode']}</p>
+            <p><b>physicalType</b>: Site</p>
+            <p><b>managingOrganization</b>: <a href="organization-{clinic_id}.html">Organization/{clinic_id}</a></p>
+        </div>"""
+    }
+    
     return clinic, location
