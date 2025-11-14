@@ -20,6 +20,12 @@ FHIR_PATH = os.getenv("FHIR_PATH", "/fhir")
 FINAL_VERIFICATION_CHECK_WAIT_TIME = 30
 
 
+WARNINGS_TO_IGNORE = [
+    "Unable to expand ValueSet: cannot apply filters",
+    "Unable to expand ValueSet because CodeSystem could not be found: http://loinc.org",
+]
+
+
 class FHIRServerConfig:
     """
     Configuration for connecting to a FHIR server.
@@ -72,7 +78,10 @@ def check_fhir_response(response: Dict[str, Any], resource_type: str, resource_i
         elif severity == 'warning':
             has_warnings = True
             resource_info = f" (ID: {resource_id})" if resource_id else ""
-            print(f"⚠️  WARNING for {resource_type}{resource_info}: {diagnostics}")
+            if any(warning in diagnostics for warning in WARNINGS_TO_IGNORE):
+                pass
+            else:
+                print(f"⚠️  WARNING for {resource_type}{resource_info}: {diagnostics}")
             if code:
                 print(f"   Code: {code}")
             if expression:
