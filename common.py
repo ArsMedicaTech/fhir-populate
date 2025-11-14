@@ -82,3 +82,16 @@ def check_fhir_response(response: Dict[str, Any], resource_type: str, resource_i
         print(f"   (Resource was created but may have validation issues)")
     
     return True
+
+
+def get_fhir_version() -> str:
+    """
+    Get the FHIR version from environment variable or default to R4.
+    
+    :return: FHIR version string ('R4' or 'R5')
+    """
+    fhir_version = os.getenv('FHIR_VERSION', 'R4').upper()
+    if fhir_version not in ['R4', 'R5']:
+        print(f"Warning: Invalid FHIR_VERSION '{fhir_version}', defaulting to R4")
+        fhir_version = 'R4'
+    return fhir_version

@@ -18,24 +18,12 @@ from faker import Faker
 
 from typing import Dict, Any
 
+from common import get_fhir_version
 from lib.data.encounter_reasons import ENCOUNTER_REASON_CODES
 
 
 # Initialize Faker to generate random data
 fake = Faker()
-
-
-def get_fhir_version() -> str:
-    """
-    Get the FHIR version from environment variable or default to R4.
-    
-    :return: FHIR version string ('R4' or 'R5')
-    """
-    fhir_version = os.getenv('FHIR_VERSION', 'R4').upper()
-    if fhir_version not in ['R4', 'R5']:
-        print(f"Warning: Invalid FHIR_VERSION '{fhir_version}', defaulting to R4")
-        fhir_version = 'R4'
-    return fhir_version
 
 
 def generate_appointment(patient_id: str, practitioner_id: str, location_id: str) -> Dict[str, Any]:
