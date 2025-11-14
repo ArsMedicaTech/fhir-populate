@@ -3,7 +3,7 @@ Generates FHIR Observation resources with realistic data.
 """
 import uuid
 import random
-from datetime import timedelta
+from datetime import timedelta, timezone
 from faker import Faker
 
 from typing import Dict, Any
@@ -30,7 +30,14 @@ def generate_observation(patient_id: str, practitioner_id: str) -> Dict[str, Any
 
     # Generate a random effective date within the last year
     effective_date = fake.date_time_between(start_date='-1y', end_date='now')
+    # Ensure timezone is included in datetime strings (FHIR requirement)
+    if effective_date.tzinfo is None:
+        effective_date = effective_date.replace(tzinfo=timezone.utc)
+    
     issued_date = effective_date + timedelta(minutes=random.randint(30, 120))
+    # Ensure timezone is included (issued is an instant, requires timezone)
+    if issued_date.tzinfo is None:
+        issued_date = issued_date.replace(tzinfo=timezone.utc)
 
     # Generate a realistic value based on normal ranges and interpretations
     interpretation = random.choice(list(observation["interpretations"].keys()))
@@ -65,9 +72,7 @@ def generate_observation(patient_id: str, practitioner_id: str) -> Dict[str, Any
         "issued": issued_date.isoformat(),
         "valueQuantity": {
             "value": value,
-            "unit": observation["unit"],
-            "system": observation["unit_system"],
-            "code": observation["unit_code"]
+            "unit": observation["unit"]
         },
         "interpretation": [
             {
@@ -82,12 +87,30 @@ def generate_observation(patient_id: str, practitioner_id: str) -> Dict[str, Any
         ]
     }
 
-    # Add performer if status is not cancelled or entered-in-error
-    if status not in ["cancelled", "entered-in-error"]:
+    # Add performer (best practice - always include if available, except for entered-in-error)
+    if practitioner_id and status != "entered-in-error":
         obs_resource["performer"] = [
             {
                 "reference": f"Practitioner/{practitioner_id}"
             }
         ]
+    
+    # Add text narrative (best practice)
+    obs_resource["text"] = {
+        "status": "generated",
+        "div": f"""<div xmlns="http://www.w3.org/1999/xhtml">
+            <p><b>Generated Narrative: Observation</b><a name="{observation_id}"> </a></p>
+            <div style="display: inline-block; background-color: #d9e0e7; padding: 6px; margin: 4px; border: 1px solid #8da1b4; border-radius: 5px; line-height: 60%">
+                <p style="margin-bottom: 0px">Resource Observation &quot;{observation_id}&quot; </p>
+            </div>
+            <p><b>status</b>: {status}</p>
+            <p><b>category</b>: {category['coding'][0]['display']}</p>
+            <p><b>code</b>: {observation['text']} ({observation['system']}#{observation['code']})</p>
+            <p><b>subject</b>: <a href="patient-{patient_id}.html">Patient/{patient_id}</a></p>
+            <p><b>effective</b>: {effective_date.strftime('%Y-%m-%dT%H:%M:%S%z')}</p>
+            <p><b>value</b>: {value} {observation['unit']}</p>
+            <p><b>interpretation</b>: {INTERPRETATION_CODES[interpretation]['display']}</p>
+        </div>"""
+    }
 
     return obs_resource
