@@ -663,11 +663,13 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
                     service_request['encounter']['reference'] = f"Encounter/{server_encounter_id}"
 
         # Create service requests with updated references
+        service_request_id_map = {}
         for service_request in service_requests:
-            response = fhir_request.create("ServiceRequest", service_request)
+            response = create_with_validation(fhir_request, "ServiceRequest", service_request)
             server_id = response.get('id')
             if not check_fhir_response(response, "ServiceRequest", server_id):
                 raise Exception(f"Failed to create ServiceRequest: {response.get('issue', [{}])[0].get('diagnostics', 'Unknown error')}")
+            service_request_id_map[service_request['id']] = server_id
             print(f"Created ServiceRequest with ID: {server_id}")
 
         # Update clinical impression references to use server-assigned IDs

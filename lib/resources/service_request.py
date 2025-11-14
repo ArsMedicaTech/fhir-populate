@@ -6,6 +6,7 @@ import random
 from faker import Faker
 from typing import Dict, Any
 
+from common import get_fhir_version
 from lib.data.service_requests import (SERVICE_REQUEST_TYPES, SERVICE_REQUEST_STATUSES, 
                                      SERVICE_REQUEST_INTENTS, SERVICE_REQUEST_PRIORITIES,
                                      SERVICE_REQUEST_REASONS, BODY_SITE_CODES)
@@ -34,9 +35,20 @@ def generate_service_request(patient_id: str, practitioner_id: str, encounter_id
     
     # Generate occurrence date (when the service should be performed)
     occurrence_date = fake.date_time_between(start_date='-30d', end_date='+30d')
+    # Ensure timezone is included in datetime strings (FHIR requirement)
+    if occurrence_date.tzinfo is None:
+        from datetime import timezone
+        occurrence_date = occurrence_date.replace(tzinfo=timezone.utc)
     
     # Generate authored date (when the request was created)
     authored_date = fake.date_time_between(start_date='-7d', end_date='now')
+    # Ensure timezone is included in datetime strings (FHIR requirement)
+    if authored_date.tzinfo is None:
+        from datetime import timezone
+        authored_date = authored_date.replace(tzinfo=timezone.utc)
+    
+    # Get FHIR version to determine field structure
+    fhir_version = get_fhir_version()
     
     # Create the service request resource
     service_request = {
@@ -45,7 +57,33 @@ def generate_service_request(patient_id: str, practitioner_id: str, encounter_id
         "status": status,
         "intent": intent,
         "priority": priority,
-        "code": {
+        "subject": {
+            "reference": f"Patient/{patient_id}"
+        },
+        "occurrenceDateTime": occurrence_date.isoformat(),
+        "authoredOn": authored_date.isoformat(),
+        "requester": {
+            "reference": f"Practitioner/{practitioner_id}",
+            "display": f"Dr. {fake.last_name()}"
+        }
+    }
+    
+    # Add code field based on FHIR version
+    if fhir_version == "R4":
+        # FHIR R4: code is a CodeableConcept directly
+        service_request["code"] = {
+            "coding": [
+                {
+                    "system": service_type["system"],
+                    "code": service_type["code"],
+                    "display": service_type["display"]
+                }
+            ],
+            "text": service_type["text"]
+        }
+    else:  # FHIR R5
+        # FHIR R5: code uses concept wrapper
+        service_request["code"] = {
             "concept": {
                 "coding": [
                     {
@@ -56,24 +94,25 @@ def generate_service_request(patient_id: str, practitioner_id: str, encounter_id
                 ],
                 "text": service_type["text"]
             }
-        },
-        "subject": {
-            "reference": f"Patient/{patient_id}"
-        },
-        "occurrenceDateTime": occurrence_date.isoformat(),
-        "authoredOn": authored_date.isoformat(),
-        "requester": {
-            "reference": f"Practitioner/{practitioner_id}",
-            "display": f"Dr. {fake.last_name()}"
-        },
-        "reason": [
+        }
+    
+    # Add reason field based on FHIR version
+    if fhir_version == "R4":
+        # FHIR R4 uses reasonCode (array of CodeableConcept)
+        service_request["reasonCode"] = [
+            {
+                "text": reason
+            }
+        ]
+    else:  # FHIR R5
+        # FHIR R5 uses reason with CodeableReference
+        service_request["reason"] = [
             {
                 "concept": {
                     "text": reason
                 }
             }
         ]
-    }
     
     # Add encounter reference if provided
     if encounter_id:
