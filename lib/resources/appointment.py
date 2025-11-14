@@ -12,8 +12,7 @@ The main difference is in the reason field structure:
 """
 import uuid
 import random
-import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from faker import Faker
 
 from typing import Dict, Any
@@ -37,7 +36,16 @@ def generate_appointment(patient_id: str, practitioner_id: str, location_id: str
     """
     appointment_id = str(uuid.uuid4())
     start_time = fake.date_time_this_month(before_now=False, after_now=True)
+    # Ensure timezone is included (start/end are instants, require timezone)
+    if start_time.tzinfo is None:
+        start_time = start_time.replace(tzinfo=timezone.utc)
+    
     end_time = start_time + timedelta(minutes=random.choice([15, 30, 45]))
+    # Ensure timezone is included
+    if end_time.tzinfo is None:
+        end_time = end_time.replace(tzinfo=timezone.utc)
+    
+    created_time = datetime.now(timezone.utc)
 
     # Select a random encounter reason
     reason_code = random.choice(ENCOUNTER_REASON_CODES)
@@ -45,15 +53,18 @@ def generate_appointment(patient_id: str, practitioner_id: str, location_id: str
     # Get FHIR version to determine reason field structure
     fhir_version = get_fhir_version()
     
+    status = random.choice(["booked", "fulfilled", "cancelled"])
+    description = f"Follow-up visit for {fake.word()}"
+    
     # Create base appointment structure
     appointment = {
         "resourceType": "Appointment",
         "id": appointment_id,
-        "status": random.choice(["booked", "fulfilled", "cancelled"]),
-        "description": f"Follow-up visit for {fake.word()}",
+        "status": status,
+        "description": description,
         "start": start_time.isoformat(),
         "end": end_time.isoformat(),
-        "created": datetime.now().isoformat(),
+        "created": created_time.isoformat(),
         "participant": [
             {
                 "actor": {"reference": f"Patient/{patient_id}"},
@@ -101,5 +112,23 @@ def generate_appointment(patient_id: str, practitioner_id: str, location_id: str
                 }
             }
         ]
+    
+    # Add text narrative (best practice)
+    appointment["text"] = {
+        "status": "generated",
+        "div": f"""<div xmlns="http://www.w3.org/1999/xhtml">
+            <p><b>Generated Narrative: Appointment</b><a name="{appointment_id}"> </a></p>
+            <div style="display: inline-block; background-color: #d9e0e7; padding: 6px; margin: 4px; border: 1px solid #8da1b4; border-radius: 5px; line-height: 60%">
+                <p style="margin-bottom: 0px">Resource Appointment &quot;{appointment_id}&quot; </p>
+            </div>
+            <p><b>status</b>: {status}</p>
+            <p><b>description</b>: {description}</p>
+            <p><b>start</b>: {start_time.strftime('%Y-%m-%dT%H:%M:%S%z')}</p>
+            <p><b>end</b>: {end_time.strftime('%Y-%m-%dT%H:%M:%S%z')}</p>
+            <p><b>created</b>: {created_time.strftime('%Y-%m-%dT%H:%M:%S%z')}</p>
+            <p><b>participant</b>: Patient/{patient_id}, Practitioner/{practitioner_id}, Location/{location_id}</p>
+            <p><b>reason</b>: {reason_code['display']}</p>
+        </div>"""
+    }
     
     return appointment
