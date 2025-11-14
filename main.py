@@ -362,7 +362,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
         # Create organizations first and store their server-assigned IDs
         organization_id_map = {}
         for i, clinic in enumerate(clinics):
-            response = fhir_request.create("Organization", clinic)
+            response = create_with_validation(fhir_request, "Organization", clinic)
             server_id = response.get('id')
             if not check_fhir_response(response, "Organization", server_id):
                 raise Exception(f"Failed to create Organization: {response.get('issue', [{}])[0].get('diagnostics', 'Unknown error')}")
@@ -378,7 +378,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
         # Create locations with updated references and store their server-assigned IDs
         location_id_map = {}
         for location in locations:
-            response = fhir_request.create("Location", location)
+            response = create_with_validation(fhir_request, "Location", location)
             server_id = response.get('id')
             if not check_fhir_response(response, "Location", server_id):
                 raise Exception(f"Failed to create Location: {response.get('issue', [{}])[0].get('diagnostics', 'Unknown error')}")
@@ -388,7 +388,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
         # Create patients first and store their server-assigned IDs
         patient_id_map = {}
         for patient in patients:
-            response = fhir_request.create("Patient", patient)
+            response = create_with_validation(fhir_request, "Patient", patient)
             server_id = response.get('id')
             if not check_fhir_response(response, "Patient", server_id):
                 raise Exception(f"Failed to create Patient: {response.get('issue', [{}])[0].get('diagnostics', 'Unknown error')}")
@@ -403,7 +403,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
         
         # Create conditions with updated references
         for condition in conditions:
-            response = fhir_request.create("Condition", condition)
+            response = create_with_validation(fhir_request, "Condition", condition)
             server_id = response.get('id')
             if not check_fhir_response(response, "Condition", server_id):
                 raise Exception(f"Failed to create Condition: {response.get('issue', [{}])[0].get('diagnostics', 'Unknown error')}")
@@ -412,7 +412,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
         # Create practitioners and store their server-assigned IDs
         practitioner_id_map = {}
         for practitioner in practitioners:
-            response = fhir_request.create("Practitioner", practitioner)
+            response = create_with_validation(fhir_request, "Practitioner", practitioner)
             server_id = response.get('id')
             if not check_fhir_response(response, "Practitioner", server_id):
                 raise Exception(f"Failed to create Practitioner: {response.get('issue', [{}])[0].get('diagnostics', 'Unknown error')}")
@@ -459,7 +459,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
             else:
                 print("WARNING: No reason field found in appointment!")
             
-            response = fhir_request.create("Appointment", appointment)
+            response = create_with_validation(fhir_request, "Appointment", appointment)
             
             # Enhanced error handling - check for any issues, not just errors
             if response.get('issue'):
@@ -536,7 +536,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
 
         # Create procedures with updated references
         for procedure in procedures:
-            response = fhir_request.create("Procedure", procedure)
+            response = create_with_validation(fhir_request, "Procedure", procedure)
             server_id = response.get('id')
             if not check_fhir_response(response, "Procedure", server_id):
                 raise Exception(f"Failed to create Procedure: {response.get('issue', [{}])[0].get('diagnostics', 'Unknown error')}")
@@ -591,7 +591,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
         # Create observations with updated references and store their server-assigned IDs
         observation_id_map = {}
         for observation in observations:
-            response = fhir_request.create("Observation", observation)
+            response = create_with_validation(fhir_request, "Observation", observation)
             server_id = response.get('id')
             if not check_fhir_response(response, "Observation", server_id):
                 raise Exception(f"Failed to create Observation: {response.get('issue', [{}])[0].get('diagnostics', 'Unknown error')}")
@@ -601,7 +601,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
         # Create medication requests with updated references and store their server-assigned IDs
         medication_request_id_map = {}
         for medication_request in medication_requests:
-            response = fhir_request.create("MedicationRequest", medication_request)
+            response = create_with_validation(fhir_request, "MedicationRequest", medication_request)
             server_id = response.get('id')
             if not check_fhir_response(response, "MedicationRequest", server_id):
                 raise Exception(f"Failed to create MedicationRequest: {response.get('issue', [{}])[0].get('diagnostics', 'Unknown error')}")
@@ -636,7 +636,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
 
         # Create diagnostic reports with updated references
         for diagnostic_report in diagnostic_reports:
-            response = fhir_request.create("DiagnosticReport", diagnostic_report)
+            response = create_with_validation(fhir_request, "DiagnosticReport", diagnostic_report)
             server_id = response.get('id')
             if not check_fhir_response(response, "DiagnosticReport", server_id):
                 raise Exception(f"Failed to create DiagnosticReport: {response.get('issue', [{}])[0].get('diagnostics', 'Unknown error')}")
@@ -718,7 +718,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
 
         # Create family member histories with updated references
         for family_member_history in family_member_histories:
-            response = fhir_request.create("FamilyMemberHistory", family_member_history)
+            response = create_with_validation(fhir_request, "FamilyMemberHistory", family_member_history)
             server_id = response.get('id')
             if not check_fhir_response(response, "FamilyMemberHistory", server_id):
                 raise Exception(f"Failed to create FamilyMemberHistory: {response.get('issue', [{}])[0].get('diagnostics', 'Unknown error')}")
@@ -753,7 +753,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
 
         # Create immunizations with updated references
         for immunization in immunizations:
-            response = fhir_request.create("Immunization", immunization)
+            response = create_with_validation(fhir_request, "Immunization", immunization)
             server_id = response.get('id')
             if not check_fhir_response(response, "Immunization", server_id):
                 raise Exception(f"Failed to create Immunization: {response.get('issue', [{}])[0].get('diagnostics', 'Unknown error')}")
@@ -788,7 +788,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
 
         # Create medication administrations with updated references
         for medication_administration in medication_administrations:
-            response = fhir_request.create("MedicationAdministration", medication_administration)
+            response = create_with_validation(fhir_request, "MedicationAdministration", medication_administration)
             server_id = response.get('id')
             if not check_fhir_response(response, "MedicationAdministration", server_id):
                 raise Exception(f"Failed to create MedicationAdministration: {response.get('issue', [{}])[0].get('diagnostics', 'Unknown error')}")
@@ -810,7 +810,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
 
         # Create allergy intolerances with updated references
         for allergy_intolerance in allergy_intolerances:
-            response = fhir_request.create("AllergyIntolerance", allergy_intolerance)
+            response = create_with_validation(fhir_request, "AllergyIntolerance", allergy_intolerance)
             server_id = response.get('id')
             if not check_fhir_response(response, "AllergyIntolerance", server_id):
                 raise Exception(f"Failed to create AllergyIntolerance: {response.get('issue', [{}])[0].get('diagnostics', 'Unknown error')}")
@@ -846,7 +846,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
 
         # Create care plans with updated references
         for care_plan in care_plans:
-            response = fhir_request.create("CarePlan", care_plan)
+            response = create_with_validation(fhir_request, "CarePlan", care_plan)
             server_id = response.get('id')
             if not check_fhir_response(response, "CarePlan", server_id):
                 raise Exception(f"Failed to create CarePlan: {response.get('issue', [{}])[0].get('diagnostics', 'Unknown error')}")
@@ -875,7 +875,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
 
         # Create coverages with updated references
         for coverage in coverages:
-            response = fhir_request.create("Coverage", coverage)
+            response = create_with_validation(fhir_request, "Coverage", coverage)
             server_id = response.get('id')
             if not check_fhir_response(response, "Coverage", server_id):
                 raise Exception(f"Failed to create Coverage: {response.get('issue', [{}])[0].get('diagnostics', 'Unknown error')}")
@@ -884,7 +884,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
         # Create Binary resources first and store their server-assigned IDs
         binary_id_map = {}
         for binary in binaries:
-            response = fhir_request.create("Binary", binary)
+            response = create_with_validation(fhir_request, "Binary", binary)
             server_id = response.get('id')
             if not check_fhir_response(response, "Binary", server_id):
                 raise Exception(f"Failed to create Binary: {response.get('issue', [{}])[0].get('diagnostics', 'Unknown error')}")
@@ -926,7 +926,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
         
         # Create document references with updated references
         for document_reference in document_references:
-            response = fhir_request.create("DocumentReference", document_reference)
+            response = create_with_validation(fhir_request, "DocumentReference", document_reference)
             server_id = response.get('id')
             if not check_fhir_response(response, "DocumentReference", server_id):
                 raise Exception(f"Failed to create DocumentReference: {response.get('issue', [{}])[0].get('diagnostics', 'Unknown error')}")
