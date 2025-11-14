@@ -143,3 +143,20 @@ class Request:
 
         response = requests.get(url, headers=headers)
         return response.json()
+    
+    def validate(self, resource: str, data: dict, _format: str = 'json', _pretty: bool = True):
+        """
+        Validate a resource using FHIR $validate operation.
+        :param resource: The resource type to validate.
+        :param data: The resource data to validate.
+        :param _format: The format for the response (default: 'json').
+        :param _pretty: Whether to pretty-print the response (default: True).
+        """
+        headers = self.headers.copy()
+        headers["Content-Type"] = f"application/fhir+{_format}"
+        headers["Accept"] = headers["Accept"].format(_format=_format)
+
+        response = requests.post(
+            f"{self.protocol}://{self.host}{self.port_string}{self.path}/{resource}/$validate?_format={_format}&_pretty={_pretty}",
+            json=data, headers=headers)
+        return response.json()

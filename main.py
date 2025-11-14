@@ -345,32 +345,16 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
     if fhir_server:
         fhir_request = Request(host=fhir_server.host, port=fhir_server.port, path=fhir_server.path)
         
-        # Test FHIR server connectivity and appointment creation
+        # Test FHIR server connectivity
         print("Testing FHIR server connectivity...")
         try:
-            # Test with a simple appointment first
-            test_appointment = {
-                "resourceType": "Appointment",
-                "status": "booked",
-                "description": "Test appointment",
-                "start": "2024-01-01T10:00:00Z",
-                "end": "2024-01-01T10:30:00Z",
-                "participant": [
-                    {
-                        "actor": {"reference": "Patient/test-patient"},
-                        "status": "accepted"
-                    }
-                ]
-            }
-            
-            test_response = fhir_request.create("Appointment", test_appointment)
-            if test_response.get('issue'):
-                print("WARNING: FHIR server returned issues with test appointment:")
-                for issue in test_response['issue']:
-                    print(f"  - {issue.get('severity', 'unknown')}: {issue.get('diagnostics', 'No details')}")
-            else:
+            # Simple connectivity test - just check if server responds
+            # We skip the appointment test since it requires a real patient
+            test_response = fhir_request.search("Patient", params="_count=1")
+            if test_response.get('resourceType') == 'Bundle':
                 print("✓ FHIR server connectivity test passed")
-                
+            else:
+                print("WARNING: Unexpected response from FHIR server")
         except Exception as e:
             print(f"WARNING: FHIR server connectivity test failed: {e}")
             print("Continuing with data generation...")
@@ -596,7 +580,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
         # Create encounters with updated references and store their server-assigned IDs
         encounter_id_map = {}
         for encounter in encounters:
-            response = fhir_request.create("Encounter", encounter)
+            response = create_with_validation(fhir_request, "Encounter", encounter)
             server_id = response.get('id')
             if not check_fhir_response(response, "Encounter", server_id):
                 raise Exception(f"Failed to create Encounter: {response.get('issue', [{}])[0].get('diagnostics', 'Unknown error')}")
