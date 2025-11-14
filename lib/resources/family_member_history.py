@@ -6,6 +6,7 @@ import random
 from faker import Faker
 from typing import Dict, Any
 
+from common import get_fhir_version
 from lib.data.family_member_history import (FAMILY_MEMBER_STATUSES, FAMILY_RELATIONSHIPS, 
                                           ADMINISTRATIVE_GENDERS, FAMILY_CONDITIONS, 
                                           PARTICIPANT_FUNCTIONS, FAMILY_CONDITION_NOTES,
@@ -45,6 +46,9 @@ def generate_family_member_history(patient_id: str, practitioner_id: str = None)
     # Generate identifier
     identifier_value = f"FMH-{fake.random_number(digits=5)}"
     
+    # Get FHIR version to determine field structure
+    fhir_version = get_fhir_version()
+    
     # Create the family member history resource
     family_member_history = {
         "resourceType": "FamilyMemberHistory",
@@ -83,8 +87,8 @@ def generate_family_member_history(patient_id: str, practitioner_id: str = None)
         }
     }
     
-    # Add participant if practitioner is provided
-    if practitioner_id:
+    # Add participant if practitioner is provided (R5 only - not in R4)
+    if practitioner_id and fhir_version != "R4":
         family_member_history["participant"] = [
             {
                 "function": {
