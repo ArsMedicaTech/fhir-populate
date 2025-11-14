@@ -1,6 +1,7 @@
 """
 Some helper scripts for generating FHIR data for testing environments.
 """
+import os
 import time
 import random
 from datetime import datetime
@@ -34,7 +35,31 @@ from lib.data.document_references import DOCUMENT_TYPES
 
 
 
-def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServerConfig] = None) -> None:
+def load_config(config_file: Optional[str] = None) -> dict:
+    """
+    Load configuration from a JSON file.
+    
+    :param config_file: Path to the configuration file. If None, checks FHIR_CONFIG env var or defaults to config_high_volume.json
+    :return: Configuration dictionary
+    """
+    if config_file is None:
+        config_file = os.getenv("FHIR_CONFIG", "config_high_volume.json")
+    
+    if not os.path.exists(config_file):
+        raise FileNotFoundError(f"Configuration file not found: {config_file}")
+    
+    with open(config_file, 'r') as f:
+        config = json.load(f)
+    
+    print(f"Loaded configuration from: {config_file}")
+    if 'description' in config:
+        print(f"  Description: {config['description']}")
+    
+    return config
+
+
+def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServerConfig] = None, 
+         config_file: Optional[str] = None) -> None:
     """
     Main function to generate a set of interconnected FHIR resources.
 
@@ -43,20 +68,28 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
 
     :param output_filename: Optional; if provided, the generated data will be saved to this file.
     :param fhir_server: Optional; if provided, the generated data will be sent to this FHIR server.
+    :param config_file: Optional; path to configuration JSON file. Defaults to FHIR_CONFIG env var or config_high_volume.json
     :return: None
     """
     print("Generating FHIR compatible dummy data...")
+    
+    # Load configuration
+    config = load_config(config_file)
+    base_counts = config.get('base_counts', {})
+    per_patient = config.get('per_patient', {})
 
     # Generate clinics and their locations
     clinics = []
     locations = []
-    for _ in range(3):
+    num_clinics = base_counts.get('clinics', 3)
+    for _ in range(num_clinics):
         clinic, location = generate_clinic_and_location()
         clinics.append(clinic)
         locations.append(location)
 
     # Generate a pool of practitioners
-    practitioners = [generate_practitioner() for _ in range(10)]
+    num_practitioners = base_counts.get('practitioners', 10)
+    practitioners = [generate_practitioner() for _ in range(num_practitioners)]
 
     # Generate patients and their related data
     patients = []
@@ -78,47 +111,54 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
     document_references = []
     binaries = []
 
-    for _ in range(25):
+    num_patients = base_counts.get('patients', 25)
+    for _ in range(num_patients):
         patient = generate_patient()
         patients.append(patient)
 
-        # Generate 1 to 3 conditions for each patient
-        for _ in range(random.randint(1, 3)):
+        # Generate conditions for each patient
+        conditions_config = per_patient.get('conditions', {'min': 1, 'max': 3})
+        for _ in range(random.randint(conditions_config['min'], conditions_config['max'])):
             condition = generate_condition(patient['id'])
             conditions.append(condition)
 
-        # Generate 1 to 5 appointments for each patient
-        for _ in range(random.randint(1, 5)):
+        # Generate appointments for each patient
+        appointments_config = per_patient.get('appointments', {'min': 1, 'max': 5})
+        for _ in range(random.randint(appointments_config['min'], appointments_config['max'])):
             # Assign a random practitioner and location to the appointment
             practitioner = random.choice(practitioners)
             location = random.choice(locations)
             appointment = generate_appointment(patient['id'], practitioner['id'], location['id'])
             appointments.append(appointment)
 
-        # Generate 1 to 4 medication requests for each patient
-        for _ in range(random.randint(1, 4)):
+        # Generate medication requests for each patient
+        medication_requests_config = per_patient.get('medication_requests', {'min': 1, 'max': 4})
+        for _ in range(random.randint(medication_requests_config['min'], medication_requests_config['max'])):
             # Assign a random practitioner to the medication request
             practitioner = random.choice(practitioners)
             medication_request = generate_medication_request(patient['id'], practitioner['id'])
             medication_requests.append(medication_request)
 
-        # Generate 1 to 3 procedures for each patient
-        for _ in range(random.randint(1, 3)):
+        # Generate procedures for each patient
+        procedures_config = per_patient.get('procedures', {'min': 1, 'max': 3})
+        for _ in range(random.randint(procedures_config['min'], procedures_config['max'])):
             # Assign a random practitioner to the procedure
             practitioner = random.choice(practitioners)
             procedure = generate_procedure(patient['id'], practitioner['id'])
             procedures.append(procedure)
 
-        # Generate 2 to 6 observations for each patient
-        for _ in range(random.randint(2, 6)):
+        # Generate observations for each patient
+        observations_config = per_patient.get('observations', {'min': 2, 'max': 6})
+        for _ in range(random.randint(observations_config['min'], observations_config['max'])):
             # Assign a random practitioner to the observation
             practitioner = random.choice(practitioners)
             observation = generate_observation(patient['id'], practitioner['id'])
             observations.append(observation)
 
-        # Generate 1 to 4 encounters for each patient
+        # Generate encounters for each patient
+        encounters_config = per_patient.get('encounters', {'min': 1, 'max': 4, 'document_reference_probability': 0.8})
         patient_encounters = []
-        for _ in range(random.randint(1, 4)):
+        for _ in range(random.randint(encounters_config['min'], encounters_config['max'])):
             # Assign a random practitioner, location, and organization to the encounter
             practitioner = random.choice(practitioners)
             location = random.choice(locations)
@@ -127,8 +167,9 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
             encounters.append(encounter)
             patient_encounters.append(encounter)
             
-            # Generate clinical notes (DocumentReference) for most encounters (80% chance)
-            if random.random() < 0.8:
+            # Generate clinical notes (DocumentReference) for encounters based on config probability
+            doc_ref_probability = encounters_config.get('document_reference_probability', 0.8)
+            if random.random() < doc_ref_probability:
                 # Extract encounter date from period
                 encounter_date_str = encounter.get('period', {}).get('start')
                 if encounter_date_str:
@@ -161,8 +202,9 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
                 )
                 document_references.append(document_reference)
 
-        # Generate 1 to 2 diagnostic reports for each patient
-        for _ in range(random.randint(1, 2)):
+        # Generate diagnostic reports for each patient
+        diagnostic_reports_config = per_patient.get('diagnostic_reports', {'min': 1, 'max': 2})
+        for _ in range(random.randint(diagnostic_reports_config['min'], diagnostic_reports_config['max'])):
             # Assign a random practitioner and encounter to the diagnostic report
             practitioner = random.choice(practitioners)
             encounter = random.choice(patient_encounters)
@@ -175,8 +217,9 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
             diagnostic_report = generate_diagnostic_report(patient['id'], practitioner['id'], encounter['id'], observation_ids)
             diagnostic_reports.append(diagnostic_report)
 
-        # Generate 1 to 3 service requests for each patient
-        for _ in range(random.randint(1, 3)):
+        # Generate service requests for each patient
+        service_requests_config = per_patient.get('service_requests', {'min': 1, 'max': 3})
+        for _ in range(random.randint(service_requests_config['min'], service_requests_config['max'])):
             # Assign a random practitioner to the service request
             practitioner = random.choice(practitioners)
             # Optionally link to an encounter (50% chance)
@@ -189,8 +232,9 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
             )
             service_requests.append(service_request)
 
-        # Generate 1 to 2 clinical impressions for each patient
-        for _ in range(random.randint(1, 2)):
+        # Generate clinical impressions for each patient
+        clinical_impressions_config = per_patient.get('clinical_impressions', {'min': 1, 'max': 2})
+        for _ in range(random.randint(clinical_impressions_config['min'], clinical_impressions_config['max'])):
             # Assign a random practitioner to the clinical impression
             practitioner = random.choice(practitioners)
             # Optionally link to an encounter (70% chance)
@@ -203,8 +247,9 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
             )
             clinical_impressions.append(clinical_impression)
 
-        # Generate 2 to 4 family member histories for each patient
-        for _ in range(random.randint(2, 4)):
+        # Generate family member histories for each patient
+        family_member_histories_config = per_patient.get('family_member_histories', {'min': 2, 'max': 4})
+        for _ in range(random.randint(family_member_histories_config['min'], family_member_histories_config['max'])):
             # Assign a random practitioner to the family member history (optional)
             practitioner = random.choice(practitioners) if random.random() < 0.7 else None
             
@@ -214,8 +259,9 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
             )
             family_member_histories.append(family_member_history)
 
-        # Generate 1 to 3 immunizations for each patient
-        for _ in range(random.randint(1, 3)):
+        # Generate immunizations for each patient
+        immunizations_config = per_patient.get('immunizations', {'min': 1, 'max': 3})
+        for _ in range(random.randint(immunizations_config['min'], immunizations_config['max'])):
             # Assign a random practitioner to the immunization
             practitioner = random.choice(practitioners)
             # Optionally link to an encounter (60% chance)
@@ -231,8 +277,9 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
             )
             immunizations.append(immunization)
 
-        # Generate 2 to 5 medication administrations for each patient
-        for _ in range(random.randint(2, 5)):
+        # Generate medication administrations for each patient
+        medication_administrations_config = per_patient.get('medication_administrations', {'min': 2, 'max': 5})
+        for _ in range(random.randint(medication_administrations_config['min'], medication_administrations_config['max'])):
             # Assign a random practitioner to the medication administration
             practitioner = random.choice(practitioners)
             # Optionally link to an encounter (70% chance)
@@ -248,8 +295,9 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
             )
             medication_administrations.append(medication_administration)
 
-        # Generate 1 to 4 allergy intolerances for each patient
-        for _ in range(random.randint(1, 4)):
+        # Generate allergy intolerances for each patient
+        allergy_intolerances_config = per_patient.get('allergy_intolerances', {'min': 1, 'max': 4})
+        for _ in range(random.randint(allergy_intolerances_config['min'], allergy_intolerances_config['max'])):
             # Assign a random practitioner to the allergy (optional, 60% chance)
             practitioner = random.choice(practitioners) if random.random() < 0.6 else None
             
@@ -259,8 +307,9 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
             )
             allergy_intolerances.append(allergy_intolerance)
 
-        # Generate 1 to 3 care plans for each patient
-        for _ in range(random.randint(1, 3)):
+        # Generate care plans for each patient
+        care_plans_config = per_patient.get('care_plans', {'min': 1, 'max': 3})
+        for _ in range(random.randint(care_plans_config['min'], care_plans_config['max'])):
             # Assign a random practitioner to the care plan
             practitioner = random.choice(practitioners)
             # Optionally link to an encounter (50% chance)
@@ -276,8 +325,9 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
             )
             care_plans.append(care_plan)
 
-        # Generate 1 to 2 coverages for each patient
-        for _ in range(random.randint(1, 2)):
+        # Generate coverages for each patient
+        coverages_config = per_patient.get('coverages', {'min': 1, 'max': 2})
+        for _ in range(random.randint(coverages_config['min'], coverages_config['max'])):
             # Assign a random organization as the insurer
             organization = random.choice(clinics)
             # Optionally assign a different policy holder (20% chance)
@@ -1012,5 +1062,12 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
 
 
 if __name__ == "__main__":
-    main(output_filename="fhir_dummy_data.json", fhir_server=FHIRServerConfig(host=FHIR_HOST, port=FHIR_PORT, path=FHIR_PATH))
+    import sys
+    # Allow config file to be passed as command line argument
+    config_file = sys.argv[1] if len(sys.argv) > 1 else None
+    main(
+        output_filename="fhir_dummy_data.json", 
+        fhir_server=FHIRServerConfig(host=FHIR_HOST, port=FHIR_PORT, path=FHIR_PATH),
+        config_file=config_file
+    )
 
