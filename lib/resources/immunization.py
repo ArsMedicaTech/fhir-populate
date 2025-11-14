@@ -7,6 +7,7 @@ from datetime import timedelta
 from faker import Faker
 from typing import Dict, Any
 
+from common import get_fhir_version
 from lib.data.immunizations import (IMMUNIZATION_STATUSES, VACCINES, VACCINE_MANUFACTURERS,
                                   ADMINISTRATION_SITES, ROUTES_OF_ADMINISTRATION, 
                                   PERFORMER_FUNCTIONS, VACCINE_REACTIONS, IMMUNIZATION_REASONS,
@@ -31,8 +32,15 @@ def generate_immunization(patient_id: str, practitioner_id: str, encounter_id: s
     status = random.choice(IMMUNIZATION_STATUSES)
     vaccine = random.choice(VACCINES)
     manufacturer = random.choice(VACCINE_MANUFACTURERS)
-    site = random.choice(ADMINISTRATION_SITES)
-    route = random.choice(ROUTES_OF_ADMINISTRATION)
+    # Filter out invalid site codes - only LA and RA are commonly valid in v3-ActSite
+    # Codes like LDELT, RDELT, LTHIGH, RTHIGH, BUTT are not in the standard value set
+    valid_sites = [s for s in ADMINISTRATION_SITES if s["code"] in ["LA", "RA"]]
+    site = random.choice(valid_sites if valid_sites else ADMINISTRATION_SITES)
+    
+    # Filter out invalid route codes - only IM and PO are commonly valid in v3-RouteOfAdministration
+    # Codes like SC, ID, IN may not be in the standard value set
+    valid_routes = [r for r in ROUTES_OF_ADMINISTRATION if r["code"] in ["IM", "PO"]]
+    route = random.choice(valid_routes if valid_routes else ROUTES_OF_ADMINISTRATION)
     dose_quantity = random.choice(DOSE_QUANTITIES)
     reason = random.choice(IMMUNIZATION_REASONS)
     note = random.choice(IMMUNIZATION_NOTES)
@@ -101,8 +109,6 @@ def generate_immunization(patient_id: str, practitioner_id: str, encounter_id: s
         },
         "doseQuantity": {
             "value": dose_quantity["value"],
-            "system": "http://unitsofmeasure.org",
-            "code": dose_quantity["code"],
             "unit": dose_quantity["unit"]
         },
         "performer": [
@@ -142,15 +148,42 @@ def generate_immunization(patient_id: str, practitioner_id: str, encounter_id: s
                 "text": note
             }
         ],
-        "reason": [
-            {
-                "reference": {
-                    "reference": f"Observation/{str(uuid.uuid4())}"
-                }
-            }
-        ],
         "isSubpotent": False
     }
+    
+    # Only add system and code for valid UCUM units
+    # Convert mcg to ug (valid UCUM code for microgram)
+    valid_ucum_units = {"mL": "mL", "mg": "mg", "g": "g", "kg": "kg", "L": "L", "ug": "ug"}
+    if dose_quantity["code"] == "mcg":
+        # Convert mcg to ug (valid UCUM code)
+        immunization["doseQuantity"]["system"] = "http://unitsofmeasure.org"
+        immunization["doseQuantity"]["code"] = "ug"
+    elif dose_quantity["code"] in valid_ucum_units:
+        immunization["doseQuantity"]["system"] = "http://unitsofmeasure.org"
+        immunization["doseQuantity"]["code"] = valid_ucum_units[dose_quantity["code"]]
+    # For non-UCUM units, only include unit field (no system/code)
+    
+    # Get FHIR version to determine field structure
+    fhir_version = get_fhir_version()
+    
+    # Add reason field based on FHIR version
+    # In R4, reasonCode is used (array of CodeableConcept)
+    # In R5, reason can be reasonCode or reasonReference
+    if fhir_version == "R4":
+        # FHIR R4: reasonCode (array of CodeableConcept)
+        # For now, we'll use a simple reasonCode based on the reason text
+        immunization["reasonCode"] = [
+            {
+                "text": reason
+            }
+        ]
+    else:  # FHIR R5
+        # FHIR R5: reason can be reasonCode or reasonReference
+        immunization["reasonCode"] = [
+            {
+                "text": reason
+            }
+        ]
     
     # Add encounter reference if provided
     if encounter_id:
@@ -167,17 +200,29 @@ def generate_immunization(patient_id: str, practitioner_id: str, encounter_id: s
     # Add reaction information (30% chance)
     if random.random() < 0.3:
         reaction = random.choice(VACCINE_REACTIONS)
-        immunization["reaction"] = [
-            {
-                "date": occurrence_date.isoformat(),
-                "manifestation": {
-                    "reference": {
-                        "reference": f"Observation/{str(uuid.uuid4())}"
-                    }
-                },
-                "reported": random.choice([True, False])
-            }
-        ]
+        # In R4, reaction.detail is a Reference to an Observation, not CodeableConcept
+        if fhir_version == "R4":
+            immunization["reaction"] = [
+                {
+                    "date": occurrence_date.isoformat(),
+                    "detail": {
+                        "reference": f"Observation/{str(uuid.uuid4())}",
+                        "display": reaction
+                    },
+                    "reported": random.choice([True, False])
+                }
+            ]
+        else:  # FHIR R5
+            # R5 may support CodeableConcept
+            immunization["reaction"] = [
+                {
+                    "date": occurrence_date.isoformat(),
+                    "detail": {
+                        "text": reaction
+                    },
+                    "reported": random.choice([True, False])
+                }
+            ]
     
     # Generate text narrative
     immunization["text"] = {
