@@ -4,7 +4,7 @@ DiagnosticReport resource generation function.
 import uuid
 import random
 import base64
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from faker import Faker
 from typing import Dict, Any, List
 
@@ -35,7 +35,14 @@ def generate_diagnostic_report(patient_id: str, practitioner_id: str, encounter_
     
     # Generate effective and issued dates
     effective_date = fake.date_time_between(start_date='-1y', end_date='now')
+    # Ensure timezone is included in datetime strings (FHIR requirement)
+    if effective_date.tzinfo is None:
+        effective_date = effective_date.replace(tzinfo=timezone.utc)
+    
     issued_date = effective_date + timedelta(minutes=random.randint(30, 180))
+    # Ensure timezone is included (instants require timezone)
+    if issued_date.tzinfo is None:
+        issued_date = issued_date.replace(tzinfo=timezone.utc)
     
     # Generate a simple PDF-like content (base64 encoded)
     pdf_content = generate_simple_pdf_content(patient_id, report_type, laboratory_name, pathologist_name)
