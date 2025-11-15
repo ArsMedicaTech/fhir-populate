@@ -962,12 +962,25 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
         # Create Binary resources first and store their server-assigned IDs
         binary_id_map = {}
         for binary in binaries:
+            # Verify that the Binary has content before creating
+            if 'data' not in binary or not binary['data']:
+                print(f"⚠️  WARNING: Binary resource {binary.get('id', 'unknown')} is missing data content!")
+            else:
+                # Verify it's valid base64 (basic check)
+                try:
+                    import base64
+                    base64.b64decode(binary['data'], validate=True)
+                except Exception as e:
+                    print(f"⚠️  WARNING: Binary resource {binary.get('id', 'unknown')} has invalid base64 data: {e}")
+            
             response = create_with_validation(fhir_request, "Binary", binary)
             server_id = response.get('id')
             if not check_fhir_response(response, "Binary", server_id):
                 raise Exception(f"Failed to create Binary: {response.get('issue', [{}])[0].get('diagnostics', 'Unknown error')}")
             binary_id_map[binary['id']] = server_id
-            print(f"Created Binary with ID: {server_id}")
+            # Show content length for verification
+            content_length = len(binary.get('data', '')) if 'data' in binary else 0
+            print(f"Created Binary with ID: {server_id} (content size: {content_length} base64 chars)")
         
         # Update document reference references to use server-assigned IDs
         for document_reference in document_references:
@@ -1016,11 +1029,22 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
         
         # Create document references with updated references
         for document_reference in document_references:
+            # Get the Binary reference for informational purposes
+            binary_ref = None
+            if 'content' in document_reference and document_reference['content']:
+                binary_url = document_reference['content'][0].get('attachment', {}).get('url', '')
+                if binary_url.startswith('Binary/'):
+                    binary_ref = binary_url
+            
             response = create_with_validation(fhir_request, "DocumentReference", document_reference)
             server_id = response.get('id')
             if not check_fhir_response(response, "DocumentReference", server_id):
                 raise Exception(f"Failed to create DocumentReference: {response.get('issue', [{}])[0].get('diagnostics', 'Unknown error')}")
-            print(f"Created DocumentReference with ID: {server_id}")
+            
+            if binary_ref:
+                print(f"Created DocumentReference with ID: {server_id} (clinical note content in {binary_ref})")
+            else:
+                print(f"Created DocumentReference with ID: {server_id}")
         
         # Final verification: Check a few appointments to ensure participants are stored
         print("\n" + "="*60)
