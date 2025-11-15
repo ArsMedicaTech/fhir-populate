@@ -14,11 +14,11 @@ from lib.crud import Request
 
 from lib.resources.appointment import generate_appointment
 from lib.resources.clinic import generate_clinic_and_location
-from lib.resources.condition import generate_condition
+from lib.resources.condition import generate_condition, generate_condition_custom
 from lib.resources.encounter import generate_encounter
-from lib.resources.medication import generate_medication_request
+from lib.resources.medication import generate_medication_request, generate_medication_request_custom
 from lib.resources.observation import generate_observation
-from lib.resources.patient import generate_patient
+from lib.resources.patient import generate_patient, generate_patient_custom
 from lib.resources.practitioner import generate_practitioner
 from lib.resources.procedure import generate_procedure
 from lib.resources.diagnostic_report import generate_diagnostic_report
@@ -27,7 +27,7 @@ from lib.resources.clinical_impression import generate_clinical_impression
 from lib.resources.family_member_history import generate_family_member_history
 from lib.resources.immunization import generate_immunization
 from lib.resources.medication_administration import generate_medication_administration
-from lib.resources.allergy_intolerance import generate_allergy_intolerance
+from lib.resources.allergy_intolerance import generate_allergy_intolerance, generate_allergy_intolerance_custom
 from lib.resources.care_plan import generate_care_plan
 from lib.resources.coverage import generate_coverage
 from lib.resources.document_reference import generate_document_reference, generate_binary_resource
@@ -111,111 +111,230 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
     document_references = []
     binaries = []
 
-    num_patients = base_counts.get('patients', 25)
-    for _ in range(num_patients):
-        patient = generate_patient()
-        patients.append(patient)
-
-        # Generate conditions for each patient
-        conditions_config = per_patient.get('conditions', {'min': 1, 'max': 3})
-        for _ in range(random.randint(conditions_config['min'], conditions_config['max'])):
-            condition = generate_condition(patient['id'])
-            conditions.append(condition)
-
-        # Generate appointments for each patient
-        appointments_config = per_patient.get('appointments', {'min': 1, 'max': 5})
-        for _ in range(random.randint(appointments_config['min'], appointments_config['max'])):
-            # Assign a random practitioner and location to the appointment
-            practitioner = random.choice(practitioners)
-            location = random.choice(locations)
-            appointment = generate_appointment(patient['id'], practitioner['id'], location['id'])
-            appointments.append(appointment)
-
-        # Generate medication requests for each patient
-        medication_requests_config = per_patient.get('medication_requests', {'min': 1, 'max': 4})
-        for _ in range(random.randint(medication_requests_config['min'], medication_requests_config['max'])):
-            # Assign a random practitioner to the medication request
-            practitioner = random.choice(practitioners)
-            medication_request = generate_medication_request(patient['id'], practitioner['id'])
-            medication_requests.append(medication_request)
-
-        # Generate procedures for each patient
-        procedures_config = per_patient.get('procedures', {'min': 1, 'max': 3})
-        for _ in range(random.randint(procedures_config['min'], procedures_config['max'])):
-            # Assign a random practitioner to the procedure
-            practitioner = random.choice(practitioners)
-            procedure = generate_procedure(patient['id'], practitioner['id'])
-            procedures.append(procedure)
-
-        # Generate observations for each patient
-        observations_config = per_patient.get('observations', {'min': 2, 'max': 6})
-        for _ in range(random.randint(observations_config['min'], observations_config['max'])):
-            # Assign a random practitioner to the observation
-            practitioner = random.choice(practitioners)
-            observation = generate_observation(patient['id'], practitioner['id'])
-            observations.append(observation)
-
-        # Generate encounters for each patient
-        encounters_config = per_patient.get('encounters', {'min': 1, 'max': 4, 'document_reference_probability': 0.8})
-        patient_encounters = []
-        for _ in range(random.randint(encounters_config['min'], encounters_config['max'])):
-            # Assign a random practitioner, location, and organization to the encounter
-            practitioner = random.choice(practitioners)
-            location = random.choice(locations)
-            organization = random.choice(clinics)
-            encounter = generate_encounter(patient['id'], practitioner['id'], location['id'], organization['id'])
-            encounters.append(encounter)
-            patient_encounters.append(encounter)
+    # Check if patient-specific configurations are provided
+    patient_configs = config.get('patient_configs', [])
+    
+    if patient_configs:
+        # Use patient-specific configurations
+        num_patients = len(patient_configs)
+        for patient_config in patient_configs:
+            # Generate patient with custom attributes
+            patient = generate_patient_custom(
+                first_name=patient_config.get('first_name'),
+                last_name=patient_config.get('last_name'),
+                gender=patient_config.get('gender'),
+                birth_date=patient_config.get('birth_date')
+            )
+            patients.append(patient)
             
-            # Generate clinical notes (DocumentReference) for encounters based on config probability
-            doc_ref_probability = encounters_config.get('document_reference_probability', 0.8)
-            if random.random() < doc_ref_probability:
-                # Extract encounter date from period
-                encounter_date_str = encounter.get('period', {}).get('start')
-                if encounter_date_str:
-                    try:
-                        encounter_date = datetime.fromisoformat(encounter_date_str.replace('Z', '+00:00'))
-                    except:
+            # Generate specified conditions
+            for condition_info in patient_config.get('conditions', []):
+                condition = generate_condition_custom(
+                    patient['id'],
+                    condition_info.get('code'),
+                    condition_info.get('display')
+                )
+                conditions.append(condition)
+            
+            # Generate specified medications
+            for medication_info in patient_config.get('medications', []):
+                practitioner = random.choice(practitioners)
+                medication_request = generate_medication_request_custom(
+                    patient['id'],
+                    practitioner['id'],
+                    medication_info.get('name')
+                )
+                medication_requests.append(medication_request)
+            
+            # Generate specified allergies
+            for allergy_info in patient_config.get('allergies', []):
+                practitioner = random.choice(practitioners) if random.random() < 0.6 else None
+                allergy = generate_allergy_intolerance_custom(
+                    patient['id'],
+                    allergy_info.get('substance'),
+                    practitioner['id'] if practitioner else None
+                )
+                allergy_intolerances.append(allergy)
+            
+            # Generate appointments for each patient
+            num_appointments = patient_config.get('appointments', 1)
+            for _ in range(num_appointments):
+                practitioner = random.choice(practitioners)
+                location = random.choice(locations)
+                appointment = generate_appointment(patient['id'], practitioner['id'], location['id'])
+                appointments.append(appointment)
+            
+            # Generate encounters for each patient
+            num_encounters = patient_config.get('encounters', 1)
+            patient_encounters = []
+            for _ in range(num_encounters):
+                practitioner = random.choice(practitioners)
+                location = random.choice(locations)
+                organization = random.choice(clinics)
+                encounter = generate_encounter(patient['id'], practitioner['id'], location['id'], organization['id'])
+                encounters.append(encounter)
+                patient_encounters.append(encounter)
+                
+                # Generate clinical notes (DocumentReference) for encounters
+                encounters_config = per_patient.get('encounters', {'document_reference_probability': 0.8})
+                doc_ref_probability = encounters_config.get('document_reference_probability', 0.8)
+                if random.random() < doc_ref_probability:
+                    encounter_date_str = encounter.get('period', {}).get('start')
+                    if encounter_date_str:
+                        try:
+                            encounter_date = datetime.fromisoformat(encounter_date_str.replace('Z', '+00:00'))
+                        except:
+                            encounter_date = datetime.now()
+                    else:
                         encounter_date = datetime.now()
-                else:
-                    encounter_date = datetime.now()
-                
-                # Select a document type for this note
-                document_type = random.choice(DOCUMENT_TYPES)
-                
-                # Generate Binary resource for the note content
-                binary = generate_binary_resource(
-                    patient['id'],
-                    practitioner['id'],
-                    document_type,
-                    encounter_date
-                )
-                binaries.append(binary)
-                
-                # Generate DocumentReference linked to the encounter
-                document_reference = generate_document_reference(
-                    patient['id'],
-                    practitioner['id'],
-                    encounter['id'],
-                    binary['id'],
-                    encounter_date
-                )
-                document_references.append(document_reference)
+                    
+                    document_type = random.choice(DOCUMENT_TYPES)
+                    binary = generate_binary_resource(
+                        patient['id'],
+                        practitioner['id'],
+                        document_type,
+                        encounter_date
+                    )
+                    binaries.append(binary)
+                    
+                    document_reference = generate_document_reference(
+                        patient['id'],
+                        practitioner['id'],
+                        encounter['id'],
+                        binary['id'],
+                        encounter_date
+                    )
+                    document_references.append(document_reference)
+            
+            # Generate observations for each patient
+            num_observations = patient_config.get('observations', 2)
+            for _ in range(num_observations):
+                practitioner = random.choice(practitioners)
+                observation = generate_observation(patient['id'], practitioner['id'])
+                observations.append(observation)
+            
+            # Generate procedures for each patient
+            num_procedures = patient_config.get('procedures', 1)
+            for _ in range(num_procedures):
+                practitioner = random.choice(practitioners)
+                procedure = generate_procedure(patient['id'], practitioner['id'])
+                procedures.append(procedure)
+    else:
+        # Use standard random generation
+        num_patients = base_counts.get('patients', 25)
+        for _ in range(num_patients):
+            patient = generate_patient()
+            patients.append(patient)
 
+            # Generate conditions for each patient
+            conditions_config = per_patient.get('conditions', {'min': 1, 'max': 3})
+            for _ in range(random.randint(conditions_config['min'], conditions_config['max'])):
+                condition = generate_condition(patient['id'])
+                conditions.append(condition)
+
+            # Generate appointments for each patient
+            appointments_config = per_patient.get('appointments', {'min': 1, 'max': 5})
+            for _ in range(random.randint(appointments_config['min'], appointments_config['max'])):
+                # Assign a random practitioner and location to the appointment
+                practitioner = random.choice(practitioners)
+                location = random.choice(locations)
+                appointment = generate_appointment(patient['id'], practitioner['id'], location['id'])
+                appointments.append(appointment)
+
+            # Generate medication requests for each patient
+            medication_requests_config = per_patient.get('medication_requests', {'min': 1, 'max': 4})
+            for _ in range(random.randint(medication_requests_config['min'], medication_requests_config['max'])):
+                # Assign a random practitioner to the medication request
+                practitioner = random.choice(practitioners)
+                medication_request = generate_medication_request(patient['id'], practitioner['id'])
+                medication_requests.append(medication_request)
+            
+            # Generate encounters for each patient
+            encounters_config = per_patient.get('encounters', {'min': 1, 'max': 4, 'document_reference_probability': 0.8})
+            patient_encounters = []
+            for _ in range(random.randint(encounters_config['min'], encounters_config['max'])):
+                # Assign a random practitioner, location, and organization to the encounter
+                practitioner = random.choice(practitioners)
+                location = random.choice(locations)
+                organization = random.choice(clinics)
+                encounter = generate_encounter(patient['id'], practitioner['id'], location['id'], organization['id'])
+                encounters.append(encounter)
+                patient_encounters.append(encounter)
+                
+                # Generate clinical notes (DocumentReference) for encounters based on config probability
+                doc_ref_probability = encounters_config.get('document_reference_probability', 0.8)
+                if random.random() < doc_ref_probability:
+                    # Extract encounter date from period
+                    encounter_date_str = encounter.get('period', {}).get('start')
+                    if encounter_date_str:
+                        try:
+                            encounter_date = datetime.fromisoformat(encounter_date_str.replace('Z', '+00:00'))
+                        except:
+                            encounter_date = datetime.now()
+                    else:
+                        encounter_date = datetime.now()
+                    
+                    # Select a document type for this note
+                    document_type = random.choice(DOCUMENT_TYPES)
+                    
+                    # Generate Binary resource for the note content
+                    binary = generate_binary_resource(
+                        patient['id'],
+                        practitioner['id'],
+                        document_type,
+                        encounter_date
+                    )
+                    binaries.append(binary)
+                    
+                    # Generate DocumentReference linked to the encounter
+                    document_reference = generate_document_reference(
+                        patient['id'],
+                        practitioner['id'],
+                        encounter['id'],
+                        binary['id'],
+                        encounter_date
+                    )
+                    document_references.append(document_reference)
+
+            # Generate observations for each patient
+            observations_config = per_patient.get('observations', {'min': 2, 'max': 6})
+            for _ in range(random.randint(observations_config['min'], observations_config['max'])):
+                # Assign a random practitioner to the observation
+                practitioner = random.choice(practitioners)
+                observation = generate_observation(patient['id'], practitioner['id'])
+                observations.append(observation)
+
+            # Generate procedures for each patient
+            procedures_config = per_patient.get('procedures', {'min': 1, 'max': 3})
+            for _ in range(random.randint(procedures_config['min'], procedures_config['max'])):
+                # Assign a random practitioner to the procedure
+                practitioner = random.choice(practitioners)
+                procedure = generate_procedure(patient['id'], practitioner['id'])
+                procedures.append(procedure)
+
+    # Generate additional resources for all patients (both custom and standard)
+    # This section handles resources that are generated per patient but weren't handled in the patient loop
+    for patient in patients:
+        patient_encounters_for_patient = [e for e in encounters if e.get('subject', {}).get('reference', '').endswith(f"/{patient['id']}")]
+        
         # Generate diagnostic reports for each patient
         diagnostic_reports_config = per_patient.get('diagnostic_reports', {'min': 1, 'max': 2})
-        for _ in range(random.randint(diagnostic_reports_config['min'], diagnostic_reports_config['max'])):
-            # Assign a random practitioner and encounter to the diagnostic report
-            practitioner = random.choice(practitioners)
-            encounter = random.choice(patient_encounters)
-            
-            # Get some observations for this patient to include in the report
-            patient_observations = [obs for obs in observations if obs['subject']['reference'] == f"Patient/{patient['id']}"]
-            selected_observations = random.sample(patient_observations, min(3, len(patient_observations)))
-            observation_ids = [obs['id'] for obs in selected_observations]
-            
-            diagnostic_report = generate_diagnostic_report(patient['id'], practitioner['id'], encounter['id'], observation_ids)
-            diagnostic_reports.append(diagnostic_report)
+        if patient_encounters_for_patient:
+            for _ in range(random.randint(diagnostic_reports_config['min'], diagnostic_reports_config['max'])):
+                # Assign a random practitioner and encounter to the diagnostic report
+                practitioner = random.choice(practitioners)
+                encounter = random.choice(patient_encounters_for_patient)
+                
+                # Get some observations for this patient to include in the report
+                patient_observations = [obs for obs in observations if obs['subject']['reference'] == f"Patient/{patient['id']}"]
+                if patient_observations:
+                    selected_observations = random.sample(patient_observations, min(3, len(patient_observations)))
+                    observation_ids = [obs['id'] for obs in selected_observations]
+                else:
+                    observation_ids = []
+                
+                diagnostic_report = generate_diagnostic_report(patient['id'], practitioner['id'], encounter['id'], observation_ids)
+                diagnostic_reports.append(diagnostic_report)
 
         # Generate service requests for each patient
         service_requests_config = per_patient.get('service_requests', {'min': 1, 'max': 3})
@@ -223,7 +342,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
             # Assign a random practitioner to the service request
             practitioner = random.choice(practitioners)
             # Optionally link to an encounter (50% chance)
-            encounter = random.choice(patient_encounters) if random.choice([True, False]) else None
+            encounter = random.choice(patient_encounters_for_patient) if patient_encounters_for_patient and random.choice([True, False]) else None
             
             service_request = generate_service_request(
                 patient['id'], 
@@ -238,7 +357,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
             # Assign a random practitioner to the clinical impression
             practitioner = random.choice(practitioners)
             # Optionally link to an encounter (70% chance)
-            encounter = random.choice(patient_encounters) if random.random() < 0.7 else None
+            encounter = random.choice(patient_encounters_for_patient) if patient_encounters_for_patient and random.random() < 0.7 else None
             
             clinical_impression = generate_clinical_impression(
                 patient['id'], 
@@ -265,7 +384,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
             # Assign a random practitioner to the immunization
             practitioner = random.choice(practitioners)
             # Optionally link to an encounter (60% chance)
-            encounter = random.choice(patient_encounters) if random.random() < 0.6 else None
+            encounter = random.choice(patient_encounters_for_patient) if patient_encounters_for_patient and random.random() < 0.6 else None
             # Optionally link to a location (80% chance)
             location = random.choice(locations) if random.random() < 0.8 else None
             
@@ -283,7 +402,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
             # Assign a random practitioner to the medication administration
             practitioner = random.choice(practitioners)
             # Optionally link to an encounter (70% chance)
-            encounter = random.choice(patient_encounters) if random.random() < 0.7 else None
+            encounter = random.choice(patient_encounters_for_patient) if patient_encounters_for_patient and random.random() < 0.7 else None
             # Optionally link to a medication request (50% chance)
             medication_request = random.choice(medication_requests) if random.random() < 0.5 else None
             
@@ -313,7 +432,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
             # Assign a random practitioner to the care plan
             practitioner = random.choice(practitioners)
             # Optionally link to an encounter (50% chance)
-            encounter = random.choice(patient_encounters) if random.random() < 0.5 else None
+            encounter = random.choice(patient_encounters_for_patient) if patient_encounters_for_patient and random.random() < 0.5 else None
             # Optionally link to a condition (70% chance)
             condition = random.choice(conditions) if random.random() < 0.7 else None
             

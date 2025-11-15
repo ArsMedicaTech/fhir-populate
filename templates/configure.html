@@ -1,0 +1,325 @@
+{% extends "base.html" %}
+
+{% block title %}Configure Patients - FHIR Data Generator{% endblock %}
+
+{% block extra_js %}
+<script>
+    let patientCount = 1;
+    
+    function addPatient() {
+        patientCount++;
+        const patientsContainer = document.getElementById('patients-container');
+        const patientSection = document.createElement('div');
+        patientSection.className = 'patient-section';
+        patientSection.id = `patient-${patientCount}`;
+        patientSection.innerHTML = getPatientHTML(patientCount);
+        patientsContainer.appendChild(patientSection);
+        updatePatientIndices();
+    }
+    
+    function removePatient(index) {
+        const patientSection = document.getElementById(`patient-${index}`);
+        if (patientSection) {
+            patientSection.remove();
+            patientCount--;
+            updatePatientIndices();
+        }
+    }
+    
+    function updatePatientIndices() {
+        const sections = document.querySelectorAll('.patient-section');
+        sections.forEach((section, index) => {
+            const newIndex = index + 1;
+            section.id = `patient-${newIndex}`;
+            section.querySelector('h3').textContent = `Patient ${newIndex}`;
+            // Update all input names
+            section.querySelectorAll('input, select').forEach(input => {
+                const name = input.getAttribute('name');
+                if (name) {
+                    const parts = name.split('_');
+                    if (parts.length > 1 && parts[0] === 'patient') {
+                        parts[1] = newIndex - 1;
+                        input.setAttribute('name', parts.join('_'));
+                    }
+                }
+            });
+        });
+        document.getElementById('num_patients').value = sections.length;
+    }
+    
+    function addCondition(patientIndex) {
+        const container = document.getElementById(`patient-${patientIndex}-conditions`);
+        const count = container.querySelectorAll('.condition-item').length;
+        const conditionDiv = document.createElement('div');
+        conditionDiv.className = 'condition-item';
+        conditionDiv.innerHTML = `
+            <select name="patient_${patientIndex - 1}_condition_${count}_code" required>
+                <option value="">Select Condition</option>
+                {% for condition in conditions %}
+                <option value="{{ condition.code }}" data-display="{{ condition.display }}">{{ condition.display }} ({{ condition.code }})</option>
+                {% endfor %}
+            </select>
+            <input type="hidden" name="patient_${patientIndex - 1}_condition_${count}_display" class="condition-display">
+            <button type="button" class="remove-item-btn" onclick="this.parentElement.remove(); updateConditionCount(${patientIndex})">Remove</button>
+        `;
+        container.appendChild(conditionDiv);
+        
+        // Update display field when code changes
+        const select = conditionDiv.querySelector('select');
+        const displayInput = conditionDiv.querySelector('.condition-display');
+        select.addEventListener('change', function() {
+            const option = this.options[this.selectedIndex];
+            displayInput.value = option.getAttribute('data-display') || '';
+        });
+        
+        updateConditionCount(patientIndex);
+    }
+    
+    function updateConditionCount(patientIndex) {
+        const container = document.getElementById(`patient-${patientIndex}-conditions`);
+        const count = container.querySelectorAll('.condition-item').length;
+        document.getElementById(`patient-${patientIndex}-condition-count`).value = count;
+    }
+    
+    function addMedication(patientIndex) {
+        const container = document.getElementById(`patient-${patientIndex}-medications`);
+        const count = container.querySelectorAll('.medication-item').length;
+        const medicationDiv = document.createElement('div');
+        medicationDiv.className = 'medication-item';
+        medicationDiv.innerHTML = `
+            <select name="patient_${patientIndex - 1}_medication_${count}_name" required>
+                <option value="">Select Medication</option>
+                {% for med in medications %}
+                <option value="{{ med.name }}">{{ med.name }}</option>
+                {% endfor %}
+            </select>
+            <button type="button" class="remove-item-btn" onclick="this.parentElement.remove(); updateMedicationCount(${patientIndex})">Remove</button>
+        `;
+        container.appendChild(medicationDiv);
+        updateMedicationCount(patientIndex);
+    }
+    
+    function updateMedicationCount(patientIndex) {
+        const container = document.getElementById(`patient-${patientIndex}-medications`);
+        const count = container.querySelectorAll('.medication-item').length;
+        document.getElementById(`patient-${patientIndex}-medication-count`).value = count;
+    }
+    
+    function addAllergy(patientIndex) {
+        const container = document.getElementById(`patient-${patientIndex}-allergies`);
+        const count = container.querySelectorAll('.allergy-item').length;
+        const allergyDiv = document.createElement('div');
+        allergyDiv.className = 'allergy-item';
+        allergyDiv.innerHTML = `
+            <input type="text" name="patient_${patientIndex - 1}_allergy_${count}_substance" placeholder="Allergy substance (e.g., Penicillin, Peanuts)" required>
+            <button type="button" class="remove-item-btn" onclick="this.parentElement.remove(); updateAllergyCount(${patientIndex})">Remove</button>
+        `;
+        container.appendChild(allergyDiv);
+        updateAllergyCount(patientIndex);
+    }
+    
+    function updateAllergyCount(patientIndex) {
+        const container = document.getElementById(`patient-${patientIndex}-allergies`);
+        const count = container.querySelectorAll('.allergy-item').length;
+        document.getElementById(`patient-${patientIndex}-allergy-count`).value = count;
+    }
+    
+    function getPatientHTML(index) {
+        return `
+            <h3>Patient ${index}</h3>
+            <input type="hidden" id="patient-${index}-condition-count" name="patient_${index - 1}_condition_count" value="0">
+            <input type="hidden" id="patient-${index}-medication-count" name="patient_${index - 1}_medication_count" value="0">
+            <input type="hidden" id="patient-${index}-allergy-count" name="patient_${index - 1}_allergy_count" value="0">
+            
+            <div class="form-group">
+                <label>First Name</label>
+                <input type="text" name="patient_${index - 1}_first_name" placeholder="John">
+            </div>
+            
+            <div class="form-group">
+                <label>Last Name</label>
+                <input type="text" name="patient_${index - 1}_last_name" placeholder="Doe">
+            </div>
+            
+            <div class="form-group">
+                <label>Gender</label>
+                <select name="patient_${index - 1}_gender">
+                    <option value="unknown">Unknown</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Birth Date</label>
+                <input type="date" name="patient_${index - 1}_birth_date">
+            </div>
+            
+            <div class="form-group">
+                <h4>Conditions</h4>
+                <div id="patient-${index}-conditions"></div>
+                <button type="button" class="add-item-btn" onclick="addCondition(${index})">Add Condition</button>
+            </div>
+            
+            <div class="form-group">
+                <h4>Medications</h4>
+                <div id="patient-${index}-medications"></div>
+                <button type="button" class="add-item-btn" onclick="addMedication(${index})">Add Medication</button>
+            </div>
+            
+            <div class="form-group">
+                <h4>Allergies</h4>
+                <div id="patient-${index}-allergies"></div>
+                <button type="button" class="add-item-btn" onclick="addAllergy(${index})">Add Allergy</button>
+            </div>
+            
+            <div class="form-group">
+                <label>Number of Appointments</label>
+                <input type="number" name="patient_${index - 1}_appointments" value="1" min="0" max="10">
+            </div>
+            
+            <div class="form-group">
+                <label>Number of Encounters</label>
+                <input type="number" name="patient_${index - 1}_encounters" value="1" min="0" max="10">
+            </div>
+            
+            <div class="form-group">
+                <label>Number of Observations</label>
+                <input type="number" name="patient_${index - 1}_observations" value="2" min="0" max="20">
+            </div>
+            
+            <div class="form-group">
+                <label>Number of Procedures</label>
+                <input type="number" name="patient_${index - 1}_procedures" value="1" min="0" max="10">
+            </div>
+            
+            <button type="button" class="btn btn-secondary" onclick="removePatient(${index})" style="margin-top: 20px;">Remove Patient</button>
+        `;
+    }
+    
+    // Initialize first patient
+    document.addEventListener('DOMContentLoaded', function() {
+        const firstPatient = document.getElementById('patient-1');
+        if (firstPatient) {
+            // Add event listeners for condition selects
+            firstPatient.querySelectorAll('select[name*="condition"]').forEach(select => {
+                select.addEventListener('change', function() {
+                    const displayInput = this.parentElement.querySelector('.condition-display');
+                    if (displayInput) {
+                        const option = this.options[this.selectedIndex];
+                        displayInput.value = option.getAttribute('data-display') || '';
+                    }
+                });
+            });
+        }
+    });
+</script>
+{% endblock %}
+
+{% block content %}
+<h2>Configure Test Patients</h2>
+<p style="color: #666; margin-bottom: 30px;">
+    Configure one or more test patients with specific conditions, medications, and other clinical data.
+</p>
+
+<form method="POST" action="{{ url_for('configure') }}">
+    <input type="hidden" id="num_patients" name="num_patients" value="1">
+    
+    <div class="form-group">
+        <label>Configuration Description</label>
+        <input type="text" name="description" value="Custom patient configuration" placeholder="Description for this configuration">
+    </div>
+    
+    <div class="form-group">
+        <label>Number of Clinics</label>
+        <input type="number" name="clinics" value="3" min="1" max="10">
+    </div>
+    
+    <div class="form-group">
+        <label>Number of Practitioners</label>
+        <input type="number" name="practitioners" value="10" min="1" max="50">
+    </div>
+    
+    <div id="patients-container">
+        <div class="patient-section" id="patient-1">
+            <h3>Patient 1</h3>
+            <input type="hidden" id="patient-1-condition-count" name="patient_0_condition_count" value="0">
+            <input type="hidden" id="patient-1-medication-count" name="patient_0_medication_count" value="0">
+            <input type="hidden" id="patient-1-allergy-count" name="patient_0_allergy_count" value="0">
+            
+            <div class="form-group">
+                <label>First Name</label>
+                <input type="text" name="patient_0_first_name" placeholder="John">
+            </div>
+            
+            <div class="form-group">
+                <label>Last Name</label>
+                <input type="text" name="patient_0_last_name" placeholder="Doe">
+            </div>
+            
+            <div class="form-group">
+                <label>Gender</label>
+                <select name="patient_0_gender">
+                    <option value="unknown">Unknown</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Birth Date</label>
+                <input type="date" name="patient_0_birth_date">
+            </div>
+            
+            <div class="form-group">
+                <h4>Conditions</h4>
+                <div id="patient-1-conditions"></div>
+                <button type="button" class="add-item-btn" onclick="addCondition(1)">Add Condition</button>
+            </div>
+            
+            <div class="form-group">
+                <h4>Medications</h4>
+                <div id="patient-1-medications"></div>
+                <button type="button" class="add-item-btn" onclick="addMedication(1)">Add Medication</button>
+            </div>
+            
+            <div class="form-group">
+                <h4>Allergies</h4>
+                <div id="patient-1-allergies"></div>
+                <button type="button" class="add-item-btn" onclick="addAllergy(1)">Add Allergy</button>
+            </div>
+            
+            <div class="form-group">
+                <label>Number of Appointments</label>
+                <input type="number" name="patient_0_appointments" value="1" min="0" max="10">
+            </div>
+            
+            <div class="form-group">
+                <label>Number of Encounters</label>
+                <input type="number" name="patient_0_encounters" value="1" min="0" max="10">
+            </div>
+            
+            <div class="form-group">
+                <label>Number of Observations</label>
+                <input type="number" name="patient_0_observations" value="2" min="0" max="20">
+            </div>
+            
+            <div class="form-group">
+                <label>Number of Procedures</label>
+                <input type="number" name="patient_0_procedures" value="1" min="0" max="10">
+            </div>
+        </div>
+    </div>
+    
+    <div style="margin-top: 30px;">
+        <button type="button" class="btn btn-secondary" onclick="addPatient()">Add Another Patient</button>
+    </div>
+    
+    <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #e0e0e0;">
+        <button type="submit" class="btn">Save Configuration</button>
+    </div>
+</form>
+{% endblock %}
+

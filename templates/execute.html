@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Execute Data Generation - FHIR Data Generator{% endblock %}
+
+{% block content %}
+<h2>Data Generation Complete</h2>
+
+<div style="background: #d4edda; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #c3e6cb;">
+    <p style="color: #155724; font-size: 18px; margin-bottom: 10px;">✓ Data generation completed successfully!</p>
+    <p style="color: #155724;">
+        {% if sent_to_server %}
+            Data has been sent to the FHIR server.
+        {% else %}
+            Data has been saved to: <strong>{{ output_file }}</strong>
+        {% endif %}
+    </p>
+</div>
+
+<div style="margin-top: 30px;">
+    <h3>Next Steps</h3>
+    <ul style="color: #666; line-height: 2; margin-top: 15px; list-style-position: inside;">
+        <li>Review the generated data in the output file</li>
+        <li>Configure additional patients if needed</li>
+        <li>Generate more data with different configurations</li>
+    </ul>
+</div>
+
+<div style="margin-top: 30px;">
+    <a href="{{ url_for('configure') }}" class="btn">Configure New Patients</a>
+    <a href="{{ url_for('index') }}" class="btn btn-secondary" style="margin-left: 10px;">Back to Home</a>
+</div>
+{% endblock %}
+
