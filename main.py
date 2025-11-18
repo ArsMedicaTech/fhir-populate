@@ -31,6 +31,7 @@ from lib.resources.allergy_intolerance import generate_allergy_intolerance, gene
 from lib.resources.care_plan import generate_care_plan
 from lib.resources.coverage import generate_coverage
 from lib.resources.document_reference import generate_document_reference, generate_binary_resource
+from lib.resources.imaging_study import generate_imaging_study
 from lib.data.document_references import DOCUMENT_TYPES
 
 
@@ -110,6 +111,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
     coverages = []
     document_references = []
     binaries = []
+    imaging_studies = []
 
     # Check if patient-specific configurations are provided
     patient_configs = config.get('patient_configs', [])
@@ -351,6 +353,48 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
             )
             service_requests.append(service_request)
 
+        # Generate imaging studies for each patient
+        imaging_studies_config = per_patient.get('imaging_studies', {'min': 0, 'max': 2})
+        num_imaging_studies = random.randint(imaging_studies_config['min'], imaging_studies_config['max'])
+        if num_imaging_studies > 0:
+            # Get imaging-related service requests for this patient
+            # Check if service request code has category "imaging" or is in the imaging LOINC codes
+            patient_service_requests = [sr for sr in service_requests 
+                                       if sr.get('subject', {}).get('reference', '') == f"Patient/{patient['id']}"]
+            imaging_service_requests = []
+            for sr in patient_service_requests:
+                code_obj = sr.get('code', {})
+                # Handle both R4 (direct code) and R5 (code.concept) structures
+                if 'concept' in code_obj:
+                    code_obj = code_obj['concept']
+                coding = code_obj.get('coding', [{}])[0] if code_obj.get('coding') else {}
+                code_value = coding.get('code', '')
+                # Check if it's an imaging LOINC code or if we can determine from context
+                imaging_loinc_codes = ['24620-7', '24623-1', '24624-9', '24625-6', '24626-4', '24627-2', 
+                                      '24628-0', '24629-8', '24630-6', '24631-4', '24632-2', '24633-0', 
+                                      '24634-8', '24635-5']
+                if code_value in imaging_loinc_codes:
+                    imaging_service_requests.append(sr)
+            
+            for _ in range(num_imaging_studies):
+                # Assign a random practitioner to the imaging study
+                practitioner = random.choice(practitioners)
+                # Optionally link to an encounter (60% chance)
+                encounter = random.choice(patient_encounters_for_patient) if patient_encounters_for_patient and random.random() < 0.6 else None
+                # Optionally link to a service request if it's imaging-related (70% chance)
+                service_request = random.choice(imaging_service_requests) if imaging_service_requests and random.random() < 0.7 else None
+                # Optionally link to a location (80% chance)
+                location = random.choice(locations) if random.random() < 0.8 else None
+                
+                imaging_study = generate_imaging_study(
+                    patient['id'],
+                    practitioner['id'],
+                    encounter['id'] if encounter else None,
+                    service_request['id'] if service_request else None,
+                    location['id'] if location else None
+                )
+                imaging_studies.append(imaging_study)
+
         # Generate clinical impressions for each patient
         clinical_impressions_config = per_patient.get('clinical_impressions', {'min': 1, 'max': 2})
         for _ in range(random.randint(clinical_impressions_config['min'], clinical_impressions_config['max'])):
@@ -481,7 +525,8 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
         "care_plans": care_plans,
         "coverages": coverages,
         "document_references": document_references,
-        "binaries": binaries
+        "binaries": binaries,
+        "imaging_studies": imaging_studies
     }
 
     # Write the output to a JSON file
@@ -510,6 +555,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
     print(f" - Coverages: {len(coverages)}")
     print(f" - Document References: {len(document_references)}")
     print(f" - Binaries: {len(binaries)}")
+    print(f" - Imaging Studies: {len(imaging_studies)}")
 
     if fhir_server:
         fhir_request = Request(host=fhir_server.host, port=fhir_server.port, path=fhir_server.path)
@@ -1164,6 +1210,65 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
                 print(f"Created DocumentReference with ID: {server_id} (clinical note content in {binary_ref})")
             else:
                 print(f"Created DocumentReference with ID: {server_id}")
+        
+        # Update imaging study references to use server-assigned IDs
+        for imaging_study in imaging_studies:
+            # Update patient reference
+            original_patient_id = imaging_study['subject']['reference'].split('/')[1]
+            server_patient_id = patient_id_map[original_patient_id]
+            imaging_study['subject']['reference'] = f"Patient/{server_patient_id}"
+            
+            # Update practitioner reference (referrer)
+            if 'referrer' in imaging_study:
+                original_practitioner_id = imaging_study['referrer']['reference'].split('/')[1]
+                if original_practitioner_id in practitioner_id_map:
+                    server_practitioner_id = practitioner_id_map[original_practitioner_id]
+                    imaging_study['referrer']['reference'] = f"Practitioner/{server_practitioner_id}"
+            
+            # Update practitioner references in series performers
+            if 'series' in imaging_study:
+                for series in imaging_study['series']:
+                    if 'performer' in series:
+                        for performer in series['performer']:
+                            if 'actor' in performer:
+                                original_practitioner_id = performer['actor']['reference'].split('/')[1]
+                                if original_practitioner_id in practitioner_id_map:
+                                    server_practitioner_id = practitioner_id_map[original_practitioner_id]
+                                    performer['actor']['reference'] = f"Practitioner/{server_practitioner_id}"
+            
+            # Update encounter reference if present
+            if 'encounter' in imaging_study:
+                original_encounter_id = imaging_study['encounter']['reference'].split('/')[1]
+                server_encounter_id = encounter_id_map.get(original_encounter_id)
+                if server_encounter_id:
+                    imaging_study['encounter']['reference'] = f"Encounter/{server_encounter_id}"
+            
+            # Update service request reference if present (basedOn)
+            if 'basedOn' in imaging_study:
+                for based_on_ref in imaging_study['basedOn']:
+                    if 'reference' in based_on_ref and based_on_ref['reference'].startswith('ServiceRequest/'):
+                        original_service_request_id = based_on_ref['reference'].split('/')[1]
+                        server_service_request_id = service_request_id_map.get(original_service_request_id)
+                        if server_service_request_id:
+                            based_on_ref['reference'] = f"ServiceRequest/{server_service_request_id}"
+            
+            # Update location reference if present
+            if 'location' in imaging_study:
+                original_location_id = imaging_study['location']['reference'].split('/')[1]
+                server_location_id = location_id_map.get(original_location_id)
+                if server_location_id:
+                    imaging_study['location']['reference'] = f"Location/{server_location_id}"
+        
+        # Create imaging studies with updated references
+        for imaging_study in imaging_studies:
+            response = create_with_validation(fhir_request, "ImagingStudy", imaging_study)
+            server_id = response.get('id')
+            if not check_fhir_response(response, "ImagingStudy", server_id):
+                raise Exception(f"Failed to create ImagingStudy: {response.get('issue', [{}])[0].get('diagnostics', 'Unknown error')}")
+            modality_display = imaging_study.get('modality', [{}])[0].get('coding', [{}])[0].get('display', 'Unknown')
+            num_series = imaging_study.get('numberOfSeries', 0)
+            num_instances = imaging_study.get('numberOfInstances', 0)
+            print(f"Created ImagingStudy with ID: {server_id} ({modality_display}, {num_series} series, {num_instances} instances)")
         
         # Final verification: Check a few appointments to ensure participants are stored
         print("\n" + "="*60)
