@@ -99,9 +99,21 @@ def generate_imaging_study(
         
         # Generate instances
         instance_list = []
+        # Ensure we have valid SOP classes to choose from
+        if not DICOM_SOP_CLASSES or len(DICOM_SOP_CLASSES) == 0:
+            raise ValueError("DICOM_SOP_CLASSES list is empty")
+        
         for instance_num in range(1, num_instances + 1):
             instance_uid = generate_dicom_uid()
             sop_class = random.choice(DICOM_SOP_CLASSES)
+            
+            # Ensure sopClass is always present and non-empty (required field)
+            if not sop_class or (isinstance(sop_class, str) and sop_class.strip() == ""):
+                sop_class = "1.2.840.10008.5.1.4.1.1.2"  # Default to CT Image Storage
+            
+            # Validate that sopClass is a string (OID format)
+            if not isinstance(sop_class, str):
+                sop_class = str(sop_class)
             
             instance = {
                 "uid": instance_uid,
@@ -109,6 +121,9 @@ def generate_imaging_study(
                 "number": instance_num,
                 "title": f"Image {instance_num}"
             }
+            # Verify sopClass is present before appending (should never fail with our checks above)
+            if "sopClass" not in instance or not instance["sopClass"]:
+                raise ValueError(f"Instance {instance_num} is missing required sopClass field")
             instance_list.append(instance)
         
         # Select body site for this series
@@ -242,14 +257,9 @@ def generate_imaging_study(
         }
     ]
     
-    # Add endpoint (WADO-RS service endpoint)
+    # Note: endpoint is optional and would point to a WADO-RS service endpoint
     # In a real system, this would point to an actual PACS endpoint
-    imaging_study["endpoint"] = [
-        {
-            "reference": "Endpoint/example-wadors",
-            "display": "WADO-RS Service"
-        }
-    ]
+    # We omit it here since we don't have Endpoint resources in this sandbox
     
     # Add text narrative
     modality_display = modality["display"]
