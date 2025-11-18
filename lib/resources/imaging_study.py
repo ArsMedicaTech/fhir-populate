@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from faker import Faker
 from typing import Dict, Any, List, Optional
 
+from common import get_fhir_version
 from lib.data.imaging_studies import (
     IMAGING_MODALITIES, IMAGING_STUDY_STATUSES, IMAGING_STUDY_REASONS,
     IMAGING_BODY_SITES, IMAGING_STUDY_DESCRIPTIONS, SERIES_DESCRIPTIONS,
@@ -31,6 +32,49 @@ def generate_dicom_uid() -> str:
     root = "1.2.840.10008"
     extension_parts = [str(random.randint(1, 999)) for _ in range(5)]
     return f"{root}.{'.'.join(extension_parts)}"
+
+
+def create_imaging_instance(instance_uid: str, sop_class: str, instance_num: int) -> Dict[str, Any]:
+    """
+    Creates a valid ImagingStudy instance with all required fields.
+    
+    :param instance_uid: DICOM SOP Instance UID
+    :param sop_class: DICOM SOP Class OID (required)
+    :param instance_num: Instance number in the series
+    :return: A dictionary representing a valid ImagingStudy instance
+    """
+    # Ensure sopClass is valid
+    default_sop_class = "1.2.840.10008.5.1.4.1.1.2"  # CT Image Storage
+    
+    if not sop_class or (isinstance(sop_class, str) and sop_class.strip() == ""):
+        sop_class = default_sop_class
+    
+    if not isinstance(sop_class, str):
+        sop_class = str(sop_class)
+    
+    # sopClass must be a Coding object, not a primitive OID
+    # Structure: { "system": "urn:ietf:rfc:3986", "code": "urn:oid:...", "display": "..." }
+    sop_class_obj = {
+        "system": "urn:ietf:rfc:3986",  # Standard system for OID-based identifiers
+        "code": f"urn:oid:{sop_class}",  # OID prefixed with urn:oid:
+        "display": f"DICOM SOP Class {sop_class}"  # Human-readable description
+    }
+    
+    # Create instance with all required fields
+    instance = {
+        "uid": instance_uid,
+        "sopClass": sop_class_obj,  # Required field - must be a Coding object
+        "number": instance_num,
+        "title": f"Image {instance_num}"
+    }
+    
+    # Final validation - this should never fail, but ensures safety
+    if "sopClass" not in instance:
+        raise ValueError(f"Instance {instance_num} missing sopClass field after creation")
+    if not instance["sopClass"] or not isinstance(instance["sopClass"], dict):
+        raise ValueError(f"Instance {instance_num} has invalid sopClass field - must be a Coding object")
+    
+    return instance
 
 
 def generate_imaging_study(
@@ -107,23 +151,8 @@ def generate_imaging_study(
             instance_uid = generate_dicom_uid()
             sop_class = random.choice(DICOM_SOP_CLASSES)
             
-            # Ensure sopClass is always present and non-empty (required field)
-            if not sop_class or (isinstance(sop_class, str) and sop_class.strip() == ""):
-                sop_class = "1.2.840.10008.5.1.4.1.1.2"  # Default to CT Image Storage
-            
-            # Validate that sopClass is a string (OID format)
-            if not isinstance(sop_class, str):
-                sop_class = str(sop_class)
-            
-            instance = {
-                "uid": instance_uid,
-                "sopClass": sop_class,
-                "number": instance_num,
-                "title": f"Image {instance_num}"
-            }
-            # Verify sopClass is present before appending (should never fail with our checks above)
-            if "sopClass" not in instance or not instance["sopClass"]:
-                raise ValueError(f"Instance {instance_num} is missing required sopClass field")
+            # Use helper function to create validated instance
+            instance = create_imaging_instance(instance_uid, sop_class, instance_num)
             instance_list.append(instance)
         
         # Select body site for this series
@@ -132,32 +161,35 @@ def generate_imaging_study(
         # Select performer function
         performer_function = random.choice(PERFORMER_FUNCTIONS)
         
+        # Get FHIR version to determine field structure
+        fhir_version = get_fhir_version()
+        
+        # Create series modality structure
+        # Some servers expect Coding directly (not CodeableConcept with coding array)
+        # Try Coding structure first (system, code, display directly)
+        series_modality_obj = {
+            "system": series_modality["system"],
+            "code": series_modality["code"],
+            "display": series_modality["display"]
+        }
+        
+        # Create bodySite structure
+        # In R4, bodySite should be CodeableConcept, but some servers may expect Coding
+        # Try Coding structure first
+        body_site_obj = {
+            "system": body_site["system"],
+            "code": body_site["code"],
+            "display": body_site["display"]
+        }
+        
         # Create series
         series = {
             "uid": series_uid,
             "number": series_num,
-            "modality": {
-                "coding": [
-                    {
-                        "system": series_modality["system"],
-                        "code": series_modality["code"],
-                        "display": series_modality["display"]
-                    }
-                ]
-            },
+            "modality": series_modality_obj,
             "description": series_description,
             "numberOfInstances": num_instances,
-            "bodySite": {
-                "concept": {
-                    "coding": [
-                        {
-                            "system": body_site["system"],
-                            "code": body_site["code"],
-                            "display": body_site["display"]
-                        }
-                    ]
-                }
-            },
+            "bodySite": body_site_obj,
             "started": series_start.isoformat(),
             "performer": [
                 {
@@ -184,6 +216,20 @@ def generate_imaging_study(
     # Select reason for the study
     reason = random.choice(IMAGING_STUDY_REASONS)
     
+    # Get FHIR version to determine field structure
+    fhir_version = get_fhir_version()
+    
+    # Create modality structure
+    # Some servers expect Coding directly in the array (not CodeableConcept)
+    # Try Coding structure (system, code, display directly)
+    modality_obj = [
+        {
+            "system": modality["system"],
+            "code": modality["code"],
+            "display": modality["display"]
+        }
+    ]
+    
     # Create the imaging study resource
     imaging_study = {
         "resourceType": "ImagingStudy",
@@ -196,17 +242,7 @@ def generate_imaging_study(
             }
         ],
         "status": status,
-        "modality": [
-            {
-                "coding": [
-                    {
-                        "system": modality["system"],
-                        "code": modality["code"],
-                        "display": modality["display"]
-                    }
-                ]
-            }
-        ],
+        "modality": modality_obj,
         "subject": {
             "reference": f"Patient/{patient_id}"
         },
@@ -242,26 +278,61 @@ def generate_imaging_study(
         "reference": f"Practitioner/{practitioner_id}"
     }
     
-    # Add reason for the study
-    imaging_study["reason"] = [
-        {
-            "concept": {
-                "coding": [
-                    {
-                        "system": reason["system"],
-                        "code": reason["code"],
-                        "display": reason["display"]
-                    }
-                ]
+    # Add reason for the study (R5 only - not in R4)
+    if fhir_version != "R4":
+        imaging_study["reason"] = [
+            {
+                "concept": {
+                    "coding": [
+                        {
+                            "system": reason["system"],
+                            "code": reason["code"],
+                            "display": reason["display"]
+                        }
+                    ]
+                }
             }
-        }
-    ]
+        ]
     
     # Note: endpoint is optional and would point to a WADO-RS service endpoint
     # In a real system, this would point to an actual PACS endpoint
     # We omit it here since we don't have Endpoint resources in this sandbox
     
+    # Final validation: Ensure all instances have sopClass (required field)
+    # This is a safety check to catch any edge cases
+    default_sop_class = "1.2.840.10008.5.1.4.1.1.2"  # CT Image Storage as fallback
+    for series_idx, series in enumerate(imaging_study.get("series", [])):
+        if "instance" in series:
+            for instance_idx, instance in enumerate(series["instance"]):
+                if "sopClass" not in instance or not instance.get("sopClass"):
+                    # Log and fix missing sopClass - must be a Coding object
+                    print(f"WARNING: Series {series_idx + 1}, Instance {instance_idx + 1} missing sopClass, adding default")
+                    instance["sopClass"] = {
+                        "system": "urn:ietf:rfc:3986",
+                        "code": f"urn:oid:{default_sop_class}",
+                        "display": f"DICOM SOP Class {default_sop_class}"
+                    }
+                # Ensure it's a Coding object (dict), not a string
+                if not isinstance(instance.get("sopClass"), dict):
+                    # Convert string to Coding object if needed
+                    sop_class_value = str(instance.get("sopClass", default_sop_class))
+                    instance["sopClass"] = {
+                        "system": "urn:ietf:rfc:3986",
+                        "code": f"urn:oid:{sop_class_value}",
+                        "display": f"DICOM SOP Class {sop_class_value}"
+                    }
+                # Ensure the Coding object has required fields
+                if "code" not in instance["sopClass"] or not instance["sopClass"].get("code"):
+                    instance["sopClass"]["code"] = f"urn:oid:{default_sop_class}"
+                if "system" not in instance["sopClass"]:
+                    instance["sopClass"]["system"] = "urn:ietf:rfc:3986"
+    
     # Add text narrative
+    # modality is now Coding directly (not CodeableConcept), so access display directly
+    series_string = ''.join([
+        f'<tr><td>{s["number"]}</td><td>{s["modality"].get("display", "Unknown")}</td><td>{s["description"]}</td><td>{s["numberOfInstances"]}</td></tr>' 
+        for s in series_list
+    ])
     modality_display = modality["display"]
     imaging_study["text"] = {
         "status": "generated",
@@ -281,7 +352,7 @@ def generate_imaging_study(
             <h3>Series</h3>
             <table class="grid">
                 <tr><td><b>Series</b></td><td><b>Modality</b></td><td><b>Description</b></td><td><b>Instances</b></td></tr>
-                {''.join([f'<tr><td>{s["number"]}</td><td>{s["modality"]["coding"][0]["display"]}</td><td>{s["description"]}</td><td>{s["numberOfInstances"]}</td></tr>' for s in series_list])}
+                {series_string}
             </table>
         </div>"""
     }

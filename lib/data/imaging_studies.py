@@ -67,14 +67,14 @@ IMAGING_MODALITIES = [
     }
 ]
 
-# Imaging Study Statuses
+# Imaging Study Statuses (FHIR R4 valid values)
+# Note: "inactive" is only available in FHIR R6, not R4
 IMAGING_STUDY_STATUSES = [
     "registered",
     "available",
     "cancelled",
     "entered-in-error",
-    "unknown",
-    "inactive"
+    "unknown"
 ]
 
 # Common reasons for imaging studies (SNOMED CT)
@@ -254,26 +254,39 @@ SERIES_DESCRIPTIONS = [
 ]
 
 # Performer functions for imaging studies
+# Using valid codes from ImagingStudySeriesPerformerFunction value set
+# Valid codes: primary-performer, secondary-performer, consulter, assistant-performer, technician, observer
+# System should be the CodeSystem, not the ValueSet
 PERFORMER_FUNCTIONS = [
     {
-        "code": "OP",
-        "display": "Operator",
-        "system": "http://terminology.hl7.org/CodeSystem/v3-ParticipationType"
+        "code": "primary-performer",
+        "display": "Primary Performer",
+        "system": "http://terminology.hl7.org/CodeSystem/imagingstudy-series-performer-function"
     },
     {
-        "code": "PRF",
-        "display": "Performer",
-        "system": "http://terminology.hl7.org/CodeSystem/v3-ParticipationType"
-    },
-    {
-        "code": "VRF",
-        "display": "Verifier",
-        "system": "http://terminology.hl7.org/CodeSystem/v3-ParticipationType"
-    },
-    {
-        "code": "SPRF",
+        "code": "secondary-performer",
         "display": "Secondary Performer",
-        "system": "http://terminology.hl7.org/CodeSystem/v3-ParticipationType"
+        "system": "http://terminology.hl7.org/CodeSystem/imagingstudy-series-performer-function"
+    },
+    {
+        "code": "consulter",
+        "display": "Consulter",
+        "system": "http://terminology.hl7.org/CodeSystem/imagingstudy-series-performer-function"
+    },
+    {
+        "code": "assistant-performer",
+        "display": "Assistant Performer",
+        "system": "http://terminology.hl7.org/CodeSystem/imagingstudy-series-performer-function"
+    },
+    {
+        "code": "technician",
+        "display": "Technician",
+        "system": "http://terminology.hl7.org/CodeSystem/imagingstudy-series-performer-function"
+    },
+    {
+        "code": "observer",
+        "display": "Observer",
+        "system": "http://terminology.hl7.org/CodeSystem/imagingstudy-series-performer-function"
     }
 ]
 
