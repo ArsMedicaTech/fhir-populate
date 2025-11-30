@@ -162,6 +162,9 @@ def execute():
                              sent_to_server=send_to_server)
     
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Error during data generation: {error_details}")  # Print full traceback to console
         flash(f'Error during data generation: {str(e)}', 'error')
         return redirect(url_for('configure'))
 
