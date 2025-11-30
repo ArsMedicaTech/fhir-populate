@@ -367,7 +367,8 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
                 # Handle both R4 (direct code) and R5 (code.concept) structures
                 if 'concept' in code_obj:
                     code_obj = code_obj['concept']
-                coding = code_obj.get('coding', [{}])[0] if code_obj.get('coding') else {}
+                coding_list = code_obj.get('coding', [])
+                coding = coding_list[0] if coding_list else {}
                 code_value = coding.get('code', '')
                 # Check if it's an imaging LOINC code or if we can determine from context
                 imaging_loinc_codes = ['24620-7', '24623-1', '24624-9', '24625-6', '24626-4', '24627-2', 
@@ -448,7 +449,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
             # Optionally link to an encounter (70% chance)
             encounter = random.choice(patient_encounters_for_patient) if patient_encounters_for_patient and random.random() < 0.7 else None
             # Optionally link to a medication request (50% chance)
-            medication_request = random.choice(medication_requests) if random.random() < 0.5 else None
+            medication_request = random.choice(medication_requests) if medication_requests and random.random() < 0.5 else None
             
             medication_administration = generate_medication_administration(
                 patient['id'], 
@@ -478,7 +479,7 @@ def main(output_filename: Optional[str] = None, fhir_server: Optional[FHIRServer
             # Optionally link to an encounter (50% chance)
             encounter = random.choice(patient_encounters_for_patient) if patient_encounters_for_patient and random.random() < 0.5 else None
             # Optionally link to a condition (70% chance)
-            condition = random.choice(conditions) if random.random() < 0.7 else None
+            condition = random.choice(conditions) if conditions and random.random() < 0.7 else None
             
             care_plan = generate_care_plan(
                 patient['id'],
