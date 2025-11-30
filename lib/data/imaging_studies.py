@@ -256,37 +256,37 @@ SERIES_DESCRIPTIONS = [
 # Performer functions for imaging studies
 # Using valid codes from ImagingStudySeriesPerformerFunction value set
 # Valid codes: primary-performer, secondary-performer, consulter, assistant-performer, technician, observer
-# System should be the CodeSystem, not the ValueSet
+# Try standard HL7 FHIR CodeSystem URL format
 PERFORMER_FUNCTIONS = [
     {
         "code": "primary-performer",
         "display": "Primary Performer",
-        "system": "http://terminology.hl7.org/CodeSystem/imagingstudy-series-performer-function"
+        "system": "http://hl7.org/fhir/CodeSystem/imagingstudy-series-performer-function"
     },
     {
         "code": "secondary-performer",
         "display": "Secondary Performer",
-        "system": "http://terminology.hl7.org/CodeSystem/imagingstudy-series-performer-function"
+        "system": "http://hl7.org/fhir/CodeSystem/imagingstudy-series-performer-function"
     },
     {
         "code": "consulter",
         "display": "Consulter",
-        "system": "http://terminology.hl7.org/CodeSystem/imagingstudy-series-performer-function"
+        "system": "http://hl7.org/fhir/CodeSystem/imagingstudy-series-performer-function"
     },
     {
         "code": "assistant-performer",
         "display": "Assistant Performer",
-        "system": "http://terminology.hl7.org/CodeSystem/imagingstudy-series-performer-function"
+        "system": "http://hl7.org/fhir/CodeSystem/imagingstudy-series-performer-function"
     },
     {
         "code": "technician",
         "display": "Technician",
-        "system": "http://terminology.hl7.org/CodeSystem/imagingstudy-series-performer-function"
+        "system": "http://hl7.org/fhir/CodeSystem/imagingstudy-series-performer-function"
     },
     {
         "code": "observer",
         "display": "Observer",
-        "system": "http://terminology.hl7.org/CodeSystem/imagingstudy-series-performer-function"
+        "system": "http://hl7.org/fhir/CodeSystem/imagingstudy-series-performer-function"
     }
 ]
 
