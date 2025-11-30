@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}Server Configuration - FHIR Data Generator{% endblock %}
+
+{% block extra_js %}
+<script>
+    function checkFhirVersion() {
+        const host = document.getElementById('host').value;
+        const port = document.getElementById('port').value;
+        const path = document.getElementById('path').value;
+        
+        const button = document.getElementById('check-version-btn');
+        const resultDiv = document.getElementById('version-result');
+        
+        button.disabled = true;
+        button.textContent = 'Checking...';
+        resultDiv.innerHTML = '<p style="color: #666;">Checking server...</p>';
+        
+        fetch('/api/check-fhir-version', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                host: host,
+                port: parseInt(port),
+                path: path
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            button.disabled = false;
+            button.textContent = 'Check FHIR Version';
+            
+            if (data.success) {
+                resultDiv.innerHTML = `<p style="color: #155724; background: #d4edda; padding: 10px; border-radius: 6px; border: 1px solid #c3e6cb;">
+                    ✓ ${data.message}
+                </p>`;
+                // Optionally update the version dropdown
+                if (data.mapped_version && data.mapped_version !== 'Unknown') {
+                    document.getElementById('fhir_version').value = data.mapped_version;
+                } else if (data.version && (data.version.startsWith('4') || data.version.includes('4.0'))) {
+                    document.getElementById('fhir_version').value = 'R4';
+                } else if (data.version && (data.version.startsWith('5') || data.version.includes('5.0'))) {
+                    document.getElementById('fhir_version').value = 'R5';
+                }
+            } else {
+                resultDiv.innerHTML = `<p style="color: #721c24; background: #f8d7da; padding: 10px; border-radius: 6px; border: 1px solid #f5c6cb;">
+                    ⚠ ${data.message}
+                </p>`;
+            }
+        })
+        .catch(error => {
+            button.disabled = false;
+            button.textContent = 'Check FHIR Version';
+            resultDiv.innerHTML = `<p style="color: #721c24; background: #f8d7da; padding: 10px; border-radius: 6px; border: 1px solid #f5c6cb;">
+                ✗ Error: ${error.message}
+            </p>`;
+        });
+    }
+</script>
+{% endblock %}
+
+{% block content %}
+<h2>FHIR Server Configuration</h2>
+<p style="color: #666; margin-bottom: 30px;">
+    Configure the FHIR server connection settings and version.
+</p>
+
+<form method="POST" action="{{ url_for('server_config') }}">
+    <div class="form-group">
+        <label>Server Host</label>
+        <input type="text" id="host" name="host" value="{{ config.host }}" placeholder="localhost" required>
+    </div>
+    
+    <div class="form-group">
+        <label>Server Port</label>
+        <input type="number" id="port" name="port" value="{{ config.port }}" placeholder="8080" required>
+    </div>
+    
+    <div class="form-group">
+        <label>FHIR Path</label>
+        <input type="text" id="path" name="path" value="{{ config.path }}" placeholder="/fhir" required>
+    </div>
+    
+    <div class="form-group">
+        <label>FHIR Version</label>
+        <select id="fhir_version" name="fhir_version" required>
+            <option value="R4" {% if config.fhir_version == 'R4' %}selected{% endif %}>R4</option>
+            <option value="R5" {% if config.fhir_version == 'R5' %}selected{% endif %}>R5</option>
+        </select>
+        <p style="color: #666; font-size: 14px; margin-top: 5px;">
+            Select the FHIR version your server uses. You can use the button below to detect it automatically.
+        </p>
+    </div>
+    
+    <div class="form-group">
+        <button type="button" id="check-version-btn" class="btn btn-secondary" onclick="checkFhirVersion()">
+            Check FHIR Version
+        </button>
+        <div id="version-result" style="margin-top: 10px;"></div>
+    </div>
+    
+    <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #e0e0e0;">
+        <button type="submit" class="btn">Save Configuration</button>
+        <a href="{{ url_for('index') }}" class="btn btn-secondary" style="margin-left: 10px;">Cancel</a>
+    </div>
+</form>
+{% endblock %}
+

@@ -3,31 +3,97 @@
 {% block title %}Execute Data Generation - FHIR Data Generator{% endblock %}
 
 {% block content %}
-<h2>Data Generation Complete</h2>
-
-<div style="background: #d4edda; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #c3e6cb;">
-    <p style="color: #155724; font-size: 18px; margin-bottom: 10px;">✓ Data generation completed successfully!</p>
-    <p style="color: #155724;">
-        {% if sent_to_server %}
-            Data has been sent to the FHIR server.
-        {% else %}
-            Data has been saved to: <strong>{{ output_file }}</strong>
-        {% endif %}
+{% if sent_to_server is defined %}
+    {# Results page after execution #}
+    <h2>Data Generation Complete</h2>
+    
+    <div style="background: #d4edda; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #c3e6cb;">
+        <p style="color: #155724; font-size: 18px; margin-bottom: 10px;">✓ Data generation completed successfully!</p>
+        <p style="color: #155724;">
+            {% if sent_to_server %}
+                Data has been sent to the FHIR server at {{ server_config.host }}:{{ server_config.port }}{{ server_config.path }}
+            {% else %}
+                Data has been saved to: <strong>{{ output_file }}</strong>
+            {% endif %}
+        </p>
+    </div>
+    
+    <div style="margin-top: 30px;">
+        <h3>Next Steps</h3>
+        <ul style="color: #666; line-height: 2; margin-top: 15px; list-style-position: inside;">
+            <li>Review the generated data in the output file</li>
+            <li>Configure additional patients if needed</li>
+            <li>Generate more data with different configurations</li>
+        </ul>
+    </div>
+    
+    <div style="margin-top: 30px;">
+        <a href="{{ url_for('configure') }}" class="btn">Configure New Patients</a>
+        <a href="{{ url_for('index') }}" class="btn btn-secondary" style="margin-left: 10px;">Back to Home</a>
+    </div>
+{% else %}
+    {# Execution form page #}
+    <h2>Execute Data Generation</h2>
+    <p style="color: #666; margin-bottom: 30px;">
+        Generate FHIR data using your configured patients. You can save to a file or send directly to your FHIR server.
     </p>
-</div>
-
-<div style="margin-top: 30px;">
-    <h3>Next Steps</h3>
-    <ul style="color: #666; line-height: 2; margin-top: 15px; list-style-position: inside;">
-        <li>Review the generated data in the output file</li>
-        <li>Configure additional patients if needed</li>
-        <li>Generate more data with different configurations</li>
-    </ul>
-</div>
-
-<div style="margin-top: 30px;">
-    <a href="{{ url_for('configure') }}" class="btn">Configure New Patients</a>
-    <a href="{{ url_for('index') }}" class="btn btn-secondary" style="margin-left: 10px;">Back to Home</a>
-</div>
+    
+    <form method="POST" action="{{ url_for('execute') }}">
+        <input type="hidden" name="config_file" value="{{ config_file }}">
+        
+        <div class="form-group">
+            <label>Output File</label>
+            <input type="text" name="output_file" value="fhir_dummy_data.json" placeholder="fhir_dummy_data.json">
+            <p style="color: #666; font-size: 14px; margin-top: 5px;">
+                File name where the generated data will be saved (if not sending to server).
+            </p>
+        </div>
+        
+        <div class="form-group" style="background: #f8f9fa; padding: 20px; border-radius: 8px; border: 2px solid #e0e0e0;">
+            <h3 style="color: #667eea; margin-bottom: 15px;">FHIR Server Options</h3>
+            
+            {% if server_config %}
+            <div style="margin-bottom: 15px; padding: 15px; background: white; border-radius: 6px; border: 1px solid #ddd;">
+                <p style="margin: 0; color: #666;"><strong>Current Server Configuration:</strong></p>
+                <p style="margin: 5px 0 0 0; color: #333;">
+                    Host: <strong>{{ server_config.host }}</strong> | 
+                    Port: <strong>{{ server_config.port }}</strong> | 
+                    Path: <strong>{{ server_config.path }}</strong> | 
+                    Version: <strong>{{ server_config.fhir_version }}</strong>
+                </p>
+                <a href="{{ url_for('server_config') }}" style="color: #667eea; text-decoration: none; font-size: 14px;">Change server configuration</a>
+            </div>
+            {% else %}
+            <div style="margin-bottom: 15px; padding: 15px; background: #fff3cd; border-radius: 6px; border: 1px solid #ffc107;">
+                <p style="margin: 0; color: #856404;">
+                    <strong>No server configuration found.</strong> 
+                    <a href="{{ url_for('server_config') }}" style="color: #667eea; text-decoration: none;">Configure server settings</a> to enable server push.
+                </p>
+            </div>
+            {% endif %}
+            
+            <div class="form-group" style="margin-top: 20px;">
+                <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="checkbox" name="send_to_server" value="true" 
+                           {% if not server_config %}disabled{% endif %}
+                           style="width: auto; margin-right: 10px; cursor: pointer;">
+                    <span>Send data to FHIR server</span>
+                </label>
+                <p style="color: #666; font-size: 14px; margin-top: 5px; margin-left: 30px;">
+                    {% if server_config %}
+                        If checked, data will be sent to the configured FHIR server instead of (or in addition to) saving to file.
+                    {% else %}
+                        Please configure server settings first to enable this option.
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+        
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #e0e0e0;">
+            <button type="submit" class="btn">Generate Data</button>
+            <a href="{{ url_for('configure') }}" class="btn btn-secondary" style="margin-left: 10px;">Back to Configuration</a>
+            <a href="{{ url_for('server_config') }}" class="btn btn-secondary" style="margin-left: 10px;">Server Settings</a>
+        </div>
+    </form>
+{% endif %}
 {% endblock %}
-
