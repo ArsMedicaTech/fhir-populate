@@ -12,8 +12,12 @@ from lib.data.icd import CONDITIONS_ICD10
 from lib.data.medications import MEDICATIONS
 from lib.crud import Request
 
+from settings import PORT, SECRET_KEY
+
+
 app = Flask(__name__)
-app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key-change-in-production')
+
+app.secret_key = SECRET_KEY
 
 
 def load_available_conditions() -> List[Dict[str, str]]:
@@ -336,5 +340,5 @@ def api_medications():
 
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=int(PORT))
 
