@@ -90,3 +90,45 @@ Set the following environment variables in a `.env` file or export them in your 
 - `FHIR_HOST`: The hostname of the FHIR server (e.g., `localhost`).
 - `FHIR_PORT`: The port number of the FHIR server (e.g., `8080`).
 - `FHIR_PATH`: The base path of the FHIR server (e.g., `fhir`).
+
+# {'resourceType': 'OperationOutcome', 'issue': [{'severity': 'error', 'code': 'processing', 'diagnostics': 'HAPI-1094: Resource Organization/8abbc944-4157-4074-9427-995063516180 not found, specified in path: Location.managingOrganization'}]}
+
+
+
+Appointment reason...
+
+
+Patients
+Practitioners
+Clinics
+Locations
+Conditions
+Appointments
+Medication Requests
+Procedures
+
+Observations
+Encounters
+
+DiagnosticReport
+AllergyIntolerance
+ServiceRequest
+
+MedicationAdministration
+FamilyMemberHistory
+Immunization
+
+CarePlan
+Coverage
+
+DOUBLE CHECK GENERATED DATA FOLDER OUTPUTS...
+
+
+
+TODO:
+Pull actual data from:
+* SNOMED.
+* LOINC.
+* ICD-10.
+
+
