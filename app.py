@@ -3,6 +3,7 @@ Flask web application for configuring and executing FHIR data generation.
 """
 import os
 import json
+import threading
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from typing import Optional, Dict, Any, List
 
@@ -271,14 +272,16 @@ def execute():
                 flash(f'Configuration file not found: {config_file}', 'error')
                 return redirect(url_for('configure'))
             
-            # Execute generation
-            generate_fhir_data(
-                output_filename=output_file,
-                fhir_server=fhir_server,
-                config_file=config_file
-            )
+            def background_task():
+                # Execute generation
+                generate_fhir_data(
+                    output_filename=output_file,
+                    fhir_server=fhir_server,
+                    config_file=config_file
+                )
+            threading.Thread(target=background_task).start()
             
-            flash('Data generation completed successfully!', 'success')
+            flash('Data generation started successfully!', 'success')
         
             # Load server config for display
             server_config_file = 'server_config.json'
