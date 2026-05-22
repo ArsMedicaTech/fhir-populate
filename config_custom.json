@@ -1,0 +1,87 @@
+{
+  "description": "Custom patient configuration",
+  "base_counts": {
+    "clinics": 3,
+    "practitioners": 10,
+    "patients": 1
+  },
+  "per_patient": {
+    "conditions": {
+      "min": 0,
+      "max": 0
+    },
+    "medication_requests": {
+      "min": 0,
+      "max": 0
+    },
+    "allergy_intolerances": {
+      "min": 0,
+      "max": 0
+    },
+    "appointments": {
+      "min": 1,
+      "max": 5
+    },
+    "encounters": {
+      "min": 1,
+      "max": 4,
+      "document_reference_probability": 0.8
+    },
+    "observations": {
+      "min": 2,
+      "max": 6
+    },
+    "procedures": {
+      "min": 1,
+      "max": 3
+    },
+    "diagnostic_reports": {
+      "min": 1,
+      "max": 2
+    },
+    "service_requests": {
+      "min": 1,
+      "max": 3
+    },
+    "clinical_impressions": {
+      "min": 1,
+      "max": 2
+    },
+    "family_member_histories": {
+      "min": 2,
+      "max": 4
+    },
+    "immunizations": {
+      "min": 1,
+      "max": 3
+    },
+    "medication_administrations": {
+      "min": 2,
+      "max": 5
+    },
+    "care_plans": {
+      "min": 1,
+      "max": 3
+    },
+    "coverages": {
+      "min": 1,
+      "max": 2
+    }
+  },
+  "patient_configs": [
+    {
+      "patient_index": 0,
+      "first_name": "John",
+      "last_name": "Doe",
+      "gender": "male",
+      "birth_date": "1983-01-12",
+      "conditions": [],
+      "medications": [],
+      "allergies": [],
+      "appointments": 1,
+      "encounters": 1,
+      "observations": 2,
+      "procedures": 1
+    }
+  ]
+}

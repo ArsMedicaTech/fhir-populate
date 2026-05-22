@@ -1,0 +1,6 @@
+{
+  "host": "fhir.apphosting.services",
+  "port": 8080,
+  "path": "/fhir",
+  "fhir_version": "R4"
+}
