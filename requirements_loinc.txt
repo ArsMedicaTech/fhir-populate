@@ -1,0 +1,2 @@
+# Additional requirements for LOINC data processing
+pandas>=1.3.0
